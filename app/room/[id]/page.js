@@ -162,48 +162,24 @@ export default function GameRoom() {
     setSubmitting(true);
 
     try {
-      // Roll random number (1 to 20 for standard D20)
-      const roll = Math.floor(Math.random() * 20) + 1;
-
-      // Insert action message
-      const { error: actionError } = await supabase.from('messages').insert([
-        {
-          room_id: roomId,
-          sender_type: 'player',
-          player_id: currentPlayer.id,
-          message_type: 'action',
-          content: actionLockedText,
-          dice_roll: roll
-        }
-      ]);
-
-      if (actionError) throw actionError;
-
-      // Mock turn rotation locally for Milestone 3 verification:
-      const currentIdx = players.findIndex((p) => p.id === currentPlayer.id);
-      const nextPlayer = players[(currentIdx + 1) % players.length];
-
-      // Update room to pass turn
-      await supabase
-        .from('rooms')
-        .update({
-          active_player_id: nextPlayer.id
+      // Call consolidated backend API action route
+      const res = await fetch('/api/room/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId,
+          playerId: currentPlayer.id,
+          actionText: actionLockedText
         })
-        .eq('id', roomId);
+      });
 
-      // Insert roll announcement
-      await supabase.from('messages').insert([
-        {
-          room_id: roomId,
-          sender_type: 'system',
-          content: `🎲 ${currentPlayer.name} lanza un D20 sacando un ${roll} para realizar su acción. Turno de ${nextPlayer.name}.`
-        }
-      ]);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo procesar la acción.');
 
       setActionLockedText(null);
     } catch (err) {
-      console.error(err);
-      alert('Error al realizar la acción.');
+      console.error('Error al realizar la acción:', err);
+      alert(err.message || 'Error al procesar tu acción. Inténtalo de nuevo.');
     } finally {
       setSubmitting(false);
     }
@@ -436,7 +412,9 @@ export default function GameRoom() {
                           style={styles.rollBtn}
                           disabled={submitting}
                         >
-                          🎲 Lanzar D20 y Finalizar Turno
+                          {submitting 
+                            ? 'Consultando al GM...' 
+                            : `🎲 Lanzar ${room.current_dice_type || 'D20'} y Finalizar Turno`}
                         </button>
                       </div>
                     ) : (

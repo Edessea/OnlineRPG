@@ -13,16 +13,20 @@ export default function TypewriterText({ text = '', speed = 20 }) {
       return;
     }
 
-    let index = 0;
     setDisplayedText('');
     setIsTyping(true);
 
+    let count = 0;
     const interval = setInterval(() => {
-      // Append characters one by one
-      setDisplayedText((prev) => prev + text.charAt(index));
-      index++;
+      setDisplayedText((prev) => {
+        if (prev.length < text.length) {
+          return prev + text.charAt(prev.length);
+        }
+        return prev;
+      });
 
-      if (index >= text.length) {
+      count++;
+      if (count >= text.length) {
         clearInterval(interval);
         setIsTyping(false);
       }

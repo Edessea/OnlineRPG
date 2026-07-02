@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Edessea: Crónicas de Gemini",
+  title: "RPG Online",
   description: "Un juego de rol multijugador narrado por Inteligencia Artificial",
 };
 

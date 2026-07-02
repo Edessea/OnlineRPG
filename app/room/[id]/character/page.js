@@ -240,7 +240,7 @@ const styles = {
   },
   title: {
     fontSize: '2.8rem',
-    fontFamily: 'var(--font-serif)',
+    fontFamily: 'var(--font-sans)',
     color: 'var(--accent)',
   },
   subtitle: {
@@ -249,7 +249,7 @@ const styles = {
     marginTop: '0.5rem',
   },
   roomCode: {
-    backgroundColor: '#1b1410',
+    backgroundColor: '#0f172a',
     padding: '0.2rem 0.4rem',
     borderRadius: '4px',
     border: '1px solid var(--border)',
@@ -273,12 +273,12 @@ const styles = {
     fontSize: '0.95rem',
     fontWeight: '600',
     color: 'var(--accent)',
-    fontFamily: 'var(--font-serif)',
+    fontFamily: 'var(--font-sans)',
     letterSpacing: '0.03em',
   },
   input: {
     padding: '0.8rem 1rem',
-    backgroundColor: '#1b1410',
+    backgroundColor: '#0f172a',
     border: '1px solid var(--border)',
     borderRadius: '4px',
     color: 'var(--foreground)',
@@ -293,7 +293,7 @@ const styles = {
   },
   select: {
     padding: '0.8rem 1rem',
-    backgroundColor: '#1b1410',
+    backgroundColor: '#0f172a',
     border: '1px solid var(--border)',
     borderRadius: '4px',
     color: 'var(--foreground)',
@@ -303,7 +303,7 @@ const styles = {
   },
   textarea: {
     padding: '0.8rem 1rem',
-    backgroundColor: '#1b1410',
+    backgroundColor: '#0f172a',
     border: '1px solid var(--border)',
     borderRadius: '4px',
     color: 'var(--foreground)',
@@ -341,7 +341,7 @@ const styles = {
     marginBottom: '1rem',
   },
   loadingText: {
-    fontFamily: 'var(--font-serif)',
+    fontFamily: 'var(--font-sans)',
     fontSize: '1.2rem',
     color: 'var(--accent)',
   },

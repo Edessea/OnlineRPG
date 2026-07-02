@@ -55,7 +55,7 @@ export default function Home() {
     <div style={styles.container}>
       <header style={styles.header}>
         <div style={styles.emblem}>⚔️</div>
-        <h1 style={styles.title}>Edessea: Crónicas de Gemini</h1>
+        <h1 style={styles.title}>RPG Online</h1>
         <p style={styles.subtitle}>Un juego de rol multijugador narrado por Inteligencia Artificial</p>
       </header>
 
@@ -137,7 +137,7 @@ const styles = {
   },
   title: {
     fontSize: '3rem',
-    fontFamily: 'var(--font-serif)',
+    fontFamily: 'var(--font-sans)',
     fontWeight: 'bold',
     color: 'var(--accent)',
     textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
@@ -183,7 +183,7 @@ const styles = {
   input: {
     width: '100%',
     padding: '0.8rem 1rem',
-    backgroundColor: '#1b1410',
+    backgroundColor: '#0f172a',
     border: '1px solid var(--border)',
     borderRadius: '4px',
     color: 'var(--foreground)',

@@ -1,14 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
 
 export default function Home() {
   const router = useRouter();
-  const [roomIdInput, setRoomIdInput] = useState('');
+  const [codeDigits, setCodeDigits] = useState(['', '', '', '', '']);
+  const [focusedIndex, setFocusedIndex] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const inputRefs = [
+    useRef(null),
+    useRef(null),
+    useRef(null),
+    useRef(null),
+    useRef(null),
+  ];
 
   const generateRoomCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -52,17 +61,56 @@ export default function Home() {
     }
   };
 
+  const handleDigitChange = (e, index) => {
+    const val = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+    const newDigits = [...codeDigits];
+    
+    if (!val) {
+      newDigits[index] = '';
+      setCodeDigits(newDigits);
+      return;
+    }
+
+    newDigits[index] = val.charAt(0);
+    setCodeDigits(newDigits);
+
+    // Auto-focus next input
+    if (index < 4) {
+      inputRefs[index + 1].current?.focus();
+    }
+  };
+
+  const handleKeyDown = (e, index) => {
+    if (e.key === 'Backspace' && !codeDigits[index] && index > 0) {
+      inputRefs[index - 1].current?.focus();
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text');
+    const cleanId = extractRoomId(pastedData);
+    if (cleanId) {
+      if (cleanId.length === 5) {
+        setCodeDigits(cleanId.split(''));
+        inputRefs[4].current?.focus();
+      } else {
+        router.push(`/room/${cleanId}/character`);
+      }
+    }
+  };
+
   const handleJoinRoom = (e) => {
     e.preventDefault();
     setError(null);
 
-    const cleanId = extractRoomId(roomIdInput);
-    if (!cleanId) {
-      setError('Formato inválido. Ingresa un código de 5 letras (ej: ABCDE) o la URL de la partida.');
+    const code = codeDigits.join('').toUpperCase();
+    if (code.length < 5) {
+      setError('Por favor, ingresa el código completo de 5 letras.');
       return;
     }
 
-    router.push(`/room/${cleanId}/character`);
+    router.push(`/room/${code}/character`);
   };
 
   return (
@@ -103,14 +151,27 @@ export default function Home() {
             Entra a un reino existente ingresando el código único de la sala o el enlace que te compartió tu grupo de juego.
           </p>
           <form onSubmit={handleJoinRoom} style={styles.form}>
-            <input
-              type="text"
-              placeholder="Ej: e4b0-4057-9184... o URL completa"
-              value={roomIdInput}
-              onChange={(e) => setRoomIdInput(e.target.value)}
-              style={styles.input}
-              required
-            />
+            <div style={styles.slotsRow}>
+              {codeDigits.map((digit, idx) => (
+                <input
+                  key={idx}
+                  ref={inputRefs[idx]}
+                  type="text"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleDigitChange(e, idx)}
+                  onKeyDown={(e) => handleKeyDown(e, idx)}
+                  onPaste={handlePaste}
+                  onFocus={() => setFocusedIndex(idx)}
+                  onBlur={() => setFocusedIndex(null)}
+                  style={{
+                    ...styles.slotInput,
+                    ...(focusedIndex === idx ? styles.slotInputFocused : {})
+                  }}
+                  required
+                />
+              ))}
+            </div>
             <button 
               type="submit" 
               className="btn" 
@@ -225,5 +286,29 @@ const styles = {
     fontSize: '0.85rem',
     borderTop: '1px solid var(--border)',
     paddingTop: '2rem',
+  },
+  slotsRow: {
+    display: 'flex',
+    gap: '0.75rem',
+    justifyContent: 'center',
+    margin: '1.25rem 0',
+  },
+  slotInput: {
+    width: '3.2rem',
+    height: '3.8rem',
+    fontSize: '1.8rem',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    backgroundColor: '#0a0e17',
+    border: '2px solid var(--border)',
+    borderRadius: '6px',
+    color: 'var(--foreground)',
+    outline: 'none',
+    textTransform: 'uppercase',
+    transition: 'all 0.2s ease',
+  },
+  slotInputFocused: {
+    borderColor: 'var(--accent)',
+    boxShadow: '0 0 8px rgba(99, 102, 241, 0.25)',
   },
 };

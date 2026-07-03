@@ -19,6 +19,22 @@ export default function CharacterCreation() {
   const [charClass, setCharClass] = useState('Guerrero');
   const [description, setDescription] = useState('');
 
+  const getRoomUuid = async (code) => {
+    const isUuid = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/.test(code);
+    if (isUuid) return code;
+    
+    const { data, error: fetchErr } = await supabase
+      .from('rooms')
+      .select('id')
+      .eq('code', code.toUpperCase())
+      .maybeSingle();
+
+    if (fetchErr || !data) {
+      throw new Error('La sala especificada no existe.');
+    }
+    return data.id;
+  };
+
   // Check if player has an existing session in this room
   useEffect(() => {
     if (!roomId) return;
@@ -33,11 +49,13 @@ export default function CharacterCreation() {
           return;
         }
 
+        const roomUuid = await getRoomUuid(roomId);
+
         // Search for existing player in this room with this session_id
         const { data: player, error: fetchError } = await supabase
           .from('players')
           .select('id')
-          .eq('room_id', roomId)
+          .eq('room_id', roomUuid)
           .eq('session_id', sessionId)
           .maybeSingle();
 
@@ -51,7 +69,7 @@ export default function CharacterCreation() {
         }
       } catch (err) {
         console.error('Error al verificar sesión existente:', err);
-        setError('Error de conexión con el servidor. Inténtalo de nuevo.');
+        setError(err.message || 'Error de conexión con el servidor. Inténtalo de nuevo.');
         setLoadingSession(false);
       }
     };
@@ -73,17 +91,19 @@ export default function CharacterCreation() {
       const sessionId = localStorage.getItem('rpg_session_id');
       if (!sessionId) throw new Error('No se encontró una sesión activa.');
 
+      const roomUuid = await getRoomUuid(roomId);
+
       // 1. Fetch current player count to determine join_order
       const { count, error: countError } = await supabase
         .from('players')
         .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId);
+        .eq('room_id', roomUuid);
 
       if (countError) throw countError;
 
       // 2. Insert new player sheet
       const newPlayer = {
-        room_id: roomId,
+        room_id: roomUuid,
         session_id: sessionId,
         name: name.trim(),
         race,

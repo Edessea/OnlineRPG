@@ -191,7 +191,7 @@ export default function GameRoom() {
       <header style={styles.header}>
         <div style={styles.headerTitleContainer}>
           <h1 style={styles.headerTitle}>RPG Online</h1>
-          <span style={styles.headerRoomId}>Sala: {roomId.slice(0, 8)}...</span>
+          <span style={styles.headerRoomId}>Sala: {room?.code || roomId}</span>
         </div>
         <div style={styles.headerStatus}>
           <span style={room.status === 'lobby' ? styles.statusLobby : styles.statusPlaying}>

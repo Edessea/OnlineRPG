@@ -3,6 +3,7 @@
 -- 1. Create rooms table
 CREATE TABLE IF NOT EXISTS rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code VARCHAR(10) UNIQUE, -- User-friendly short room code (e.g. ABCDE)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   status VARCHAR(20) DEFAULT 'lobby' NOT NULL, -- 'lobby', 'playing', 'finished'
   gm_context TEXT DEFAULT '' NOT NULL, -- Cumulative memory summary updated by GM on every turn

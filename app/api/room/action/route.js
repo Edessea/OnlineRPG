@@ -73,18 +73,29 @@ export async function POST(request) {
       );
     }
 
-    // 1. Fetch Room, Active Player, and Room Players List
-    const [roomRes, playerRes, allPlayersRes] = await Promise.all([
-      supabase.from('rooms').select('*').eq('id', roomId).maybeSingle(),
+    // 1. Resolve Room by UUID or code
+    const isUuid = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/.test(roomId);
+    let roomQuery = supabase.from('rooms').select('*');
+    if (isUuid) {
+      roomQuery = roomQuery.eq('id', roomId);
+    } else {
+      roomQuery = roomQuery.eq('code', roomId.toUpperCase());
+    }
+
+    const { data: room, error: roomError } = await roomQuery.maybeSingle();
+    if (roomError || !room) throw new Error('No se encontró la sala de juego.');
+
+    const roomUuid = room.id;
+
+    // Fetch Active Player and Room Players List
+    const [playerRes, allPlayersRes] = await Promise.all([
       supabase.from('players').select('*').eq('id', playerId).maybeSingle(),
-      supabase.from('players').select('*').eq('room_id', roomId).order('join_order', { ascending: true })
+      supabase.from('players').select('*').eq('room_id', roomUuid).order('join_order', { ascending: true })
     ]);
 
-    if (roomRes.error || !roomRes.data) throw new Error('No se encontró la sala de juego.');
     if (playerRes.error || !playerRes.data) throw new Error('No se encontró el aventurero.');
     if (allPlayersRes.error || !allPlayersRes.data) throw new Error('No se pudieron obtener los aventureros.');
 
-    const room = roomRes.data;
     const player = playerRes.data;
     const allPlayers = allPlayersRes.data;
 
@@ -101,7 +112,7 @@ export async function POST(request) {
     // 3. Write player action to message logs
     const { error: msgErr1 } = await supabase.from('messages').insert([
       {
-        room_id: roomId,
+        room_id: roomUuid,
         sender_type: 'player',
         player_id: playerId,
         message_type: 'action',
@@ -114,7 +125,7 @@ export async function POST(request) {
     // 4. Write system log announcement for the roll
     const { error: msgErr2 } = await supabase.from('messages').insert([
       {
-        room_id: roomId,
+        room_id: roomUuid,
         sender_type: 'system',
         content: `🎲 ${player.name} lanza un ${diceType} sacando un ${roll} para realizar su acción.`
       }
@@ -125,7 +136,7 @@ export async function POST(request) {
     const { data: recentMsgs, error: fetchMsgsErr } = await supabase
       .from('messages')
       .select('*')
-      .eq('room_id', roomId)
+      .eq('room_id', roomUuid)
       .order('created_at', { ascending: false })
       .limit(15);
 
@@ -215,7 +226,7 @@ INSTRUCCIONES PARA TU RESPUESTA:
     // A. Insert GM Narrative Message
     const { error: gmMsgErr } = await supabase.from('messages').insert([
       {
-        room_id: roomId,
+        room_id: roomUuid,
         sender_type: 'gm',
         content: gmResponse.gm_message
       }
@@ -261,7 +272,7 @@ INSTRUCCIONES PARA TU RESPUESTA:
         active_player_id: finalNextPlayerId,
         current_dice_type: gmResponse.next_dice_type || 'D20'
       })
-      .eq('id', roomId);
+      .eq('id', roomUuid);
 
     if (roomUpdateErr) throw roomUpdateErr;
 

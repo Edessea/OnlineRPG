@@ -10,27 +10,41 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Helper to extract UUID from a string (which can be a full URL or a raw ID)
-  const extractUUID = (text) => {
+  const generateRoomCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let code = '';
+    for (let i = 0; i < 5; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
+
+  const extractRoomId = (text) => {
+    // Match UUID or 5-letter alphabetical code
     const uuidRegex = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;
-    const match = text.match(uuidRegex);
-    return match ? match[0] : null;
+    const codeRegex = /\b[a-zA-Z]{5}\b/;
+    
+    const uuidMatch = text.match(uuidRegex);
+    if (uuidMatch) return uuidMatch[0];
+    
+    const codeMatch = text.match(codeRegex);
+    return codeMatch ? codeMatch[0].toUpperCase() : null;
   };
 
   const handleCreateRoom = async () => {
     setLoading(true);
     setError(null);
     try {
+      const roomCode = generateRoomCode();
       const { data, error: insertError } = await supabase
         .from('rooms')
-        .insert([{ status: 'lobby' }])
+        .insert([{ status: 'lobby', code: roomCode }])
         .select();
 
       if (insertError) throw insertError;
       if (!data || data.length === 0) throw new Error('No se pudo crear la sala.');
 
-      const newRoomId = data[0].id;
-      router.push(`/room/${newRoomId}/character`);
+      router.push(`/room/${roomCode}/character`);
     } catch (err) {
       console.error('Error al crear la sala:', err);
       setError(err.message || 'Error al iniciar la aventura. Inténtalo de nuevo.');
@@ -42,9 +56,9 @@ export default function Home() {
     e.preventDefault();
     setError(null);
 
-    const cleanId = extractUUID(roomIdInput);
+    const cleanId = extractRoomId(roomIdInput);
     if (!cleanId) {
-      setError('Formato inválido. Ingresa un ID de sala válido (UUID) o la URL completa de la partida.');
+      setError('Formato inválido. Ingresa un código de 5 letras (ej: ABCDE) o la URL de la partida.');
       return;
     }
 

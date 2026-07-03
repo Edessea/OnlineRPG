@@ -24,6 +24,9 @@ export default function GameRoom() {
   // Character Detail Modal
   const [modalPlayer, setModalPlayer] = useState(null);
 
+  // Spectator mode for dead players
+  const [isSpectating, setIsSpectating] = useState(false);
+
   // Scroll anchor for chat
   const chatEndRef = useRef(null);
 
@@ -77,6 +80,7 @@ export default function GameRoom() {
   }
 
   const activePlayer = players.find((p) => p.id === room.active_player_id);
+  const isDead = currentPlayer && (currentPlayer.stats?.HP ?? 100) <= 0;
 
   // Start the adventure
   const handleStartGame = async () => {
@@ -84,43 +88,14 @@ export default function GameRoom() {
     try {
       if (players.length === 0) throw new Error('No hay aventureros en la sala.');
 
-      // The first player in join_order gets the first turn
-      const firstPlayer = players[0];
+      const res = await fetch('/api/room/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId })
+      });
 
-      // Update room to active status
-      const { error: roomError } = await supabase
-        .from('rooms')
-        .update({
-          status: 'playing',
-          active_player_id: firstPlayer.id
-        })
-        .eq('id', roomId);
-
-      if (roomError) throw roomError;
-
-      // Insert system announcement message
-      const { error: msgError } = await supabase
-        .from('messages')
-        .insert([
-          {
-            room_id: roomId,
-            sender_type: 'system',
-            content: `⚔️ ¡La aventura ha comenzado! El destino de la partida está en juego. Es el turno de ${firstPlayer.name}.`
-          }
-        ]);
-
-      if (msgError) throw msgError;
-
-      // Create initial Game Master welcoming message
-      const welcomeNarration = `El cielo se tiñe de un morado místico mientras vuestro grupo se reúne a las puertas de la mazmorra ancestral. El aire sopla helado, cargado de polvo mágico y susurros olvidados. Frente a vosotros se alza una pesada puerta de hierro fundido decorada con runas resplandecientes.\n\nEl portal os llama. ¿Qué haréis primero?`;
-
-      await supabase.from('messages').insert([
-        {
-          room_id: roomId,
-          sender_type: 'gm',
-          content: welcomeNarration
-        }
-      ]);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo iniciar la aventura.');
     } catch (err) {
       alert(err.message || 'Error al iniciar la aventura.');
     } finally {
@@ -362,8 +337,51 @@ export default function GameRoom() {
               </div>
             )}
 
-            {/* If Game is Active */}
-            {room.status === 'playing' && (
+            {/* If player is dead and hasn't chosen to spectate yet */}
+            {room.status === 'playing' && isDead && !isSpectating && (
+              <div style={styles.deathConsole}>
+                <div style={styles.deathHeader}>
+                  <span style={styles.deathIcon}>💀</span>
+                  <h3>Has Caído en Combate</h3>
+                </div>
+                <p style={styles.deathText}>
+                  Tu aventurero ha perecido en esta travesía. Puedes quedarte a observar en silencio el destino de tus compañeros, o retirarte y volver a la posada.
+                </p>
+                <div style={styles.deathButtonsRow}>
+                  <button 
+                    className="btn" 
+                    onClick={() => setIsSpectating(true)}
+                    style={styles.spectateBtn}
+                  >
+                    👁️ Observar como Espectador
+                  </button>
+                  <button 
+                    className="btn" 
+                    onClick={() => router.push('/')}
+                    style={styles.leaveBtn}
+                  >
+                    🚶 Abandonar Aventura
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* If player is spectating */}
+            {room.status === 'playing' && isDead && isSpectating && (
+              <div style={styles.spectatorConsole}>
+                <span style={styles.spectatorText}>👁️ Modo Espectador: Estás observando la aventura en silencio. Tu personaje ha caído.</span>
+                <button 
+                  className="btn" 
+                  onClick={() => router.push('/')}
+                  style={styles.spectatorLeaveBtn}
+                >
+                  Volver a la Posada
+                </button>
+              </div>
+            )}
+
+            {/* If Game is Active and Player is Alive */}
+            {room.status === 'playing' && !isDead && (
               <div style={styles.playingConsole}>
                 {/* Form Controls */}
                 <div style={styles.toggleRow}>
@@ -937,5 +955,61 @@ const styles = {
     maxHeight: '400px',
     objectFit: 'cover',
     display: 'block',
+  },
+  deathConsole: {
+    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+    border: '1px solid rgba(239, 68, 68, 0.3)',
+    borderRadius: '8px',
+    padding: '1.75rem',
+    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+  },
+  deathHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.75rem',
+  },
+  deathIcon: {
+    fontSize: '1.75rem',
+  },
+  deathText: {
+    color: 'var(--secondary)',
+    margin: 0,
+    fontSize: '0.95rem',
+    lineHeight: '1.5',
+  },
+  deathButtonsRow: {
+    display: 'flex',
+    gap: '1rem',
+    justifyContent: 'center',
+    marginTop: '0.5rem',
+  },
+  spectateBtn: {
+    backgroundColor: '#1e293b',
+    border: '1px solid var(--border)',
+  },
+  leaveBtn: {
+    backgroundColor: 'var(--failure)',
+  },
+  spectatorConsole: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0a0e17',
+    border: '1px solid var(--border)',
+    borderRadius: '6px',
+    padding: '1rem 1.5rem',
+    gap: '1rem',
+  },
+  spectatorText: {
+    color: 'var(--secondary)',
+    fontSize: '0.92rem',
+    fontStyle: 'italic',
+  },
+  spectatorLeaveBtn: {
+    padding: '0.5rem 1.25rem',
   },
 };

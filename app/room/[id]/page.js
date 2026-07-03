@@ -112,7 +112,7 @@ export default function GameRoom() {
     try {
       const { error: sendError } = await supabase.from('messages').insert([
         {
-          room_id: roomId,
+          room_id: room.id,
           sender_type: 'player',
           player_id: currentPlayer.id,
           message_type: 'chat',

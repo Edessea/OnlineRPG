@@ -48,6 +48,13 @@ export default function GameRoom() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Redirect to end summary page when room status changes to finished
+  useEffect(() => {
+    if (room && room.status === 'finished') {
+      router.push(`/room/${roomId}/end`);
+    }
+  }, [room, roomId, router]);
+
   if (loading || isCheckingPlayer) {
     return (
       <div style={styles.loadingContainer}>
@@ -288,6 +295,16 @@ export default function GameRoom() {
                           m.content
                         )}
                       </div>
+                      {m.image_url && (
+                        <div style={styles.imageContainer}>
+                          <img 
+                            src={m.image_url} 
+                            alt="Ilustración escénica del Narrador" 
+                            style={styles.scenicImage}
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 }
@@ -905,5 +922,20 @@ const styles = {
     background: 'var(--background)',
     padding: '2rem',
     textAlign: 'center',
+  },
+  imageContainer: {
+    marginTop: '1.25rem',
+    borderRadius: '8px',
+    overflow: 'hidden',
+    border: '1px solid var(--border)',
+    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.4)',
+    maxWidth: '100%',
+  },
+  scenicImage: {
+    width: '100%',
+    height: 'auto',
+    maxHeight: '400px',
+    objectFit: 'cover',
+    display: 'block',
   },
 };

@@ -49,6 +49,14 @@ const responseSchema = {
     updated_gm_context: {
       type: SchemaType.STRING,
       description: "El resumen de memoria actualizado y condensado de la partida (Quest status, eventos clave, etc)."
+    },
+    game_status: {
+      type: SchemaType.STRING,
+      description: "El estado actual del juego. Debe ser 'playing' para continuar la partida, o 'finished' si la aventura concluyó en victoria o derrota de los héroes."
+    },
+    campaign_outcome: {
+      type: SchemaType.STRING,
+      description: "Una breve descripción del desenlace final de la aventura (solo si game_status es 'finished'; de lo contrario, puede ser un string vacío)."
     }
   },
   required: [
@@ -58,7 +66,9 @@ const responseSchema = {
     "updated_players",
     "is_critical_moment",
     "image_prompt",
-    "updated_gm_context"
+    "updated_gm_context",
+    "game_status",
+    "campaign_outcome"
   ]
 };
 
@@ -195,7 +205,10 @@ INSTRUCCIONES PARA TU RESPUESTA:
    - Establece el tipo de dado para la siguiente acción del próximo jugador en "next_dice_type" (ej: "D20" por defecto, o dados menores como "D10", "D8", "D6" si están en una situación apremiante o combate cerrado).
 5. Ilustración Escénica:
    - Si ocurre algo épico, cómico o un giro dramático, pon "is_critical_moment" en true y genera un prompt descriptivo en inglés para Midjourney/DallE en "image_prompt".
-6. Contexto de Memoria:
+6. Estado de la Campaña:
+   - Evalúa si la aventura ha terminado. Establece "game_status" en "finished" si todos los aventureros han muerto (HP = 0) o si han completado con éxito su misión (victoria). De lo contrario, debe ser "playing".
+   - Si declaras "finished", describe la victoria o derrota final brevemente en "campaign_outcome" (ej: "Los aventureros perecieron ante el fuego del dragón" o "Los héroes recuperaron la gema y salvaron el reino"). De lo contrario, pon un string vacío.
+7. Contexto de Memoria:
    - Modifica el "updated_gm_context" resumiendo el estado actual de la campaña y hechos críticos para recordar en turnos posteriores.
 `;
 
@@ -223,17 +236,26 @@ INSTRUCCIONES PARA TU RESPUESTA:
     const gmResponse = JSON.parse(textResult);
 
     // 7. Write Game Master responses and updates to Supabase
-    // A. Insert GM Narrative Message
+    // A. Handle Image Generation if it's a critical moment
+    let finalImageUrl = null;
+    if (gmResponse.is_critical_moment) {
+      const seed = Math.floor(Math.random() * 1000000);
+      const encodedPrompt = encodeURIComponent(gmResponse.image_prompt);
+      finalImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${seed}`;
+    }
+
+    // B. Insert GM Narrative Message
     const { error: gmMsgErr } = await supabase.from('messages').insert([
       {
         room_id: roomUuid,
         sender_type: 'gm',
-        content: gmResponse.gm_message
+        content: gmResponse.gm_message,
+        image_url: finalImageUrl
       }
     ]);
     if (gmMsgErr) throw gmMsgErr;
 
-    // B. Apply Player Stat Changes
+    // C. Apply Player Stat Changes
     if (gmResponse.updated_players && gmResponse.updated_players.length > 0) {
       for (const up of gmResponse.updated_players) {
         // Fetch current player to merge default stats if missing
@@ -254,7 +276,7 @@ INSTRUCCIONES PARA TU RESPUESTA:
       }
     }
 
-    // C. Update Room State (turn, context, dice type)
+    // D. Update Room State (turn, context, dice type, status)
     // Validate next_player_id is in room
     let finalNextPlayerId = gmResponse.next_player_id;
     const isValidId = allPlayers.some((p) => p.id === finalNextPlayerId);
@@ -265,13 +287,31 @@ INSTRUCCIONES PARA TU RESPUESTA:
       finalNextPlayerId = fallbackPlayer.id;
     }
 
+    const isFinished = gmResponse.game_status === 'finished';
+    const roomUpdates = {
+      gm_context: gmResponse.updated_gm_context || room.gm_context,
+      active_player_id: finalNextPlayerId,
+      current_dice_type: gmResponse.next_dice_type || 'D20'
+    };
+
+    if (isFinished) {
+      roomUpdates.status = 'finished';
+      // Determine if defeat or victory based on surviving players
+      const allDead = allPlayers.every((p) => {
+        const updatedStats = gmResponse.updated_players?.find((up) => up.id === p.id)?.stats;
+        const currentHP = updatedStats ? updatedStats.HP : (p.stats?.HP ?? 100);
+        return currentHP <= 0;
+      });
+      if (allDead) {
+        roomUpdates.defeat_condition = gmResponse.campaign_outcome || 'El grupo ha caído en batalla.';
+      } else {
+        roomUpdates.victory_condition = gmResponse.campaign_outcome || '¡Los aventureros han completado su gesta!';
+      }
+    }
+
     const { error: roomUpdateErr } = await supabase
       .from('rooms')
-      .update({
-        gm_context: gmResponse.updated_gm_context || room.gm_context,
-        active_player_id: finalNextPlayerId,
-        current_dice_type: gmResponse.next_dice_type || 'D20'
-      })
+      .update(roomUpdates)
       .eq('id', roomUuid);
 
     if (roomUpdateErr) throw roomUpdateErr;

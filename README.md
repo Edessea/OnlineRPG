@@ -1,5 +1,19 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Prerequisites
+
+- **Node.js**: `v20.9.0` or higher is required.
+- **Supabase Project**: For database, storage, and authentication services.
+- **Gemini API Key**: From Google AI Studio for AI features.
+
+## Setup Instructions
+
+1. **Configure Environment Variables**:
+   Copy the example environment variables file to `.env.local` and fill in your credentials:
+   ```bash
+   cp .env.local.example .env.local
+   ```
+
 ## Getting Started
 
 First, run the development server:

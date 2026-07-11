@@ -708,7 +708,9 @@ const styles = {
   playerMsg: {
     alignSelf: 'flex-start',
     backgroundColor: 'var(--card-bg)',
-    border: '1px solid var(--border)',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: 'var(--border)',
     borderRadius: '8px',
     padding: '1rem 1.25rem',
     maxWidth: '80%',

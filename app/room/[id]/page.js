@@ -93,7 +93,7 @@ export default function GameRoom() {
   const activePlayer = players.find((p) => p.id === room.active_player_id);
   const isDead = currentPlayer && (currentPlayer.stats?.HP ?? 100) <= 0;
 
-  // Start the adventure
+  // Start the campaign
   const handleStartGame = async () => {
     setSubmitting(true);
     try {
@@ -106,9 +106,9 @@ export default function GameRoom() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'No se pudo iniciar la aventura.');
+      if (!res.ok) throw new Error(data.error || 'No se pudo iniciar la campaña.');
     } catch (err) {
-      alert(err.message || 'Error al iniciar la aventura.');
+      alert(err.message || 'Error al iniciar la campaña.');
     } finally {
       setSubmitting(false);
     }
@@ -188,7 +188,7 @@ export default function GameRoom() {
         </div>
         <div style={styles.headerStatus}>
           <span style={room.status === 'lobby' ? styles.statusLobby : styles.statusPlaying}>
-            ● {room.status === 'lobby' ? 'Lobby Abierto' : 'Aventura Iniciada'}
+            ● {room.status === 'lobby' ? 'Lobby Abierto' : 'Campaña Iniciada'}
           </span>
           <span style={styles.playerCount}>{players.length} Aventureros</span>
           <button
@@ -351,11 +351,11 @@ export default function GameRoom() {
                     disabled={submitting || players.length === 0}
                     style={styles.startBtn}
                   >
-                    {submitting ? 'Iniciando Aventura...' : 'Comenzar Aventura'}
+                    {submitting ? 'Iniciando Campaña...' : 'Comenzar Campaña'}
                   </button>
                 ) : (
                   <p style={{ fontStyle: 'italic', color: 'var(--secondary)', marginTop: '1rem' }}>
-                    Esperando a que el creador de la campaña inicie la aventura...
+                    Esperando a que el creador de la campaña inicie la campaña...
                   </p>
                 )}
               </div>
@@ -384,7 +384,7 @@ export default function GameRoom() {
                     onClick={() => router.push('/')}
                     style={styles.leaveBtn}
                   >
-                    🚶 Abandonar Aventura
+                    🚶 Abandonar Campaña
                   </button>
                 </div>
               </div>
@@ -393,7 +393,7 @@ export default function GameRoom() {
             {/* If player is spectating */}
             {room.status === 'playing' && isDead && isSpectating && (
               <div style={styles.spectatorConsole}>
-                <span style={styles.spectatorText}>👁️ Modo Espectador: Estás observando la aventura en silencio. Tu personaje ha caído.</span>
+                <span style={styles.spectatorText}>👁️ Modo Espectador: Estás observando la campaña en silencio. Tu personaje ha caído.</span>
                 <button 
                   className="btn" 
                   onClick={() => router.push('/')}

@@ -11,7 +11,7 @@ const responseSchema = {
     },
     initial_context: {
       type: SchemaType.STRING,
-      description: "El resumen inicial de memoria y quest status de la aventura para la memoria futura del GM."
+      description: "El resumen inicial de memoria y quest status de la campaña para la memoria futura del GM."
     }
   },
   required: ["welcome_message", "initial_context"]
@@ -40,7 +40,7 @@ export async function POST(request) {
     // Enforce campaign creator validation
     if (room.creator_id && room.creator_id !== userId) {
       return NextResponse.json(
-        { error: 'Solo el creador de la campaña puede iniciar la aventura.' },
+        { error: 'Solo el creador de la campaña puede iniciar la campaña.' },
         { status: 403 }
       );
     }
@@ -72,7 +72,7 @@ export async function POST(request) {
 Estás iniciando una nueva campaña de juego de rol de mesa.
 Ubicación inicial: Frente a la pesada puerta de hierro fundido decorada con runas resplandecientes de una mazmorra ancestral ancestral, bajo un cielo morado místico.
 
-AVENTUREROS REGISTRADOS EN ESTA AVENTURA:
+AVENTUREROS REGISTRADOS EN ESTA CAMPAÑA:
 ${playerListText}
 
 REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
@@ -124,7 +124,7 @@ REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
       {
         room_id: roomUuid,
         sender_type: 'system',
-        content: `⚔️ ¡La aventura ha comenzado! El destino de la partida está en juego. Es el turno de ${firstPlayer.name}.`
+        content: `⚔️ ¡La campaña ha comenzado! El destino de la campaña está en juego. Es el turno de ${firstPlayer.name}.`
       }
     ]);
 
@@ -139,9 +139,9 @@ REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
 
     return NextResponse.json({ success: true, message: 'La campaña ha comenzado exitosamente.' });
   } catch (err) {
-    console.error('Error al iniciar partida:', err);
+    console.error('Error al iniciar campaña:', err);
     return NextResponse.json(
-      { error: err.message || 'Error interno al inicializar la aventura.' },
+      { error: err.message || 'Error interno al inicializar la campaña.' },
       { status: 500 }
     );
   }

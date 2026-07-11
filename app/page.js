@@ -241,7 +241,7 @@ export default function Home() {
       router.push(`/room/${roomCode}/character`);
     } catch (err) {
       console.error('Error al crear la sala:', err);
-      setError(err.message || 'Error al iniciar la aventura. Inténtalo de nuevo.');
+      setError(err.message || 'Error al iniciar la campaña. Inténtalo de nuevo.');
       setLoading(false);
     }
   };
@@ -572,7 +572,7 @@ export default function Home() {
         {/* Card: Create adventure */}
         <section className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '2rem', minHeight: '220px' }}>
           <div>
-            <h3 style={{ fontSize: '1.4rem', marginBottom: '0.75rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Crear una Aventura</h3>
+            <h3 style={{ fontSize: '1.4rem', marginBottom: '0.75rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Crear una Campaña</h3>
             <p style={{ color: 'var(--secondary)', fontSize: '0.92rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
               Forja una nueva sala de juego. Serás el creador de la campaña y el único capaz de abrir el portal cuando tu grupo esté listo.
             </p>
@@ -582,14 +582,14 @@ export default function Home() {
             onClick={handleCreateRoom} 
             disabled={loading}
           >
-            {loading ? 'Invocando portal...' : 'Iniciar Nueva Partida'}
+            {loading ? 'Invocando portal...' : 'Iniciar Nueva Campaña'}
           </button>
         </section>
 
         {/* Card: Join adventure */}
         <section className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '2rem', minHeight: '220px' }}>
           <div>
-            <h3 style={{ fontSize: '1.4rem', marginBottom: '0.75rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Unirse a la Partida</h3>
+            <h3 style={{ fontSize: '1.4rem', marginBottom: '0.75rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Unirse a la Campaña</h3>
             <p style={{ color: 'var(--secondary)', fontSize: '0.92rem', lineHeight: '1.6', marginBottom: '1rem' }}>
               Entra a un reino existente ingresando el código único de la sala que te compartió tu grupo.
             </p>

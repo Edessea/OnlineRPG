@@ -48,15 +48,15 @@ const responseSchema = {
     },
     updated_gm_context: {
       type: SchemaType.STRING,
-      description: "El resumen de memoria actualizado y condensado de la partida (Quest status, eventos clave, etc)."
+      description: "El resumen de memoria actualizado y condensado de la campaña (Quest status, eventos clave, etc)."
     },
     game_status: {
       type: SchemaType.STRING,
-      description: "El estado actual del juego. Debe ser 'playing' para continuar la partida, o 'finished' si la aventura concluyó en victoria o derrota de los héroes."
+      description: "El estado actual del juego. Debe ser 'playing' para continuar la campaña, o 'finished' si la campaña concluyó en victoria o derrota de los héroes."
     },
     campaign_outcome: {
       type: SchemaType.STRING,
-      description: "Una breve descripción del desenlace final de la aventura (solo si game_status es 'finished'; de lo contrario, puede ser un string vacío)."
+      description: "Una breve descripción del desenlace final de la campaña (solo si game_status es 'finished'; de lo contrario, puede ser un string vacío)."
     }
   },
   required: [
@@ -206,7 +206,7 @@ INSTRUCCIONES PARA TU RESPUESTA:
 5. Ilustración Escénica:
    - Si ocurre algo épico, cómico o un giro dramático, pon "is_critical_moment" en true y genera un prompt descriptivo en inglés para Midjourney/DallE en "image_prompt".
 6. Estado de la Campaña:
-   - Evalúa si la aventura ha terminado. Establece "game_status" en "finished" si todos los aventureros han muerto (HP = 0) o si han completado con éxito su misión (victoria). De lo contrario, debe ser "playing".
+   - Evalúa si la campaña ha terminado. Establece "game_status" en "finished" si todos los aventureros han muerto (HP = 0) o si han completado con éxito su misión (victoria). De lo contrario, debe ser "playing".
    - Si declaras "finished", describe la victoria o derrota final brevemente en "campaign_outcome" (ej: "Los aventureros perecieron ante el fuego del dragón" o "Los héroes recuperaron la gema y salvaron el reino"). De lo contrario, pon un string vacío.
 7. Contexto de Memoria:
    - Modifica el "updated_gm_context" resumiendo el estado actual de la campaña y hechos críticos para recordar en turnos posteriores.

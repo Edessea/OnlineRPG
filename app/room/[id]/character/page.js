@@ -198,7 +198,7 @@ export default function CharacterCreation() {
           <form onSubmit={handleSubmit} style={styles.form}>
             {/* Character Selection Grid */}
             <div>
-              <label style={styles.label}>Selecciona tu personaje para esta partida</label>
+              <label style={styles.label}>Selecciona tu personaje para esta campaña</label>
               <div className="char-selection-grid">
                 {userCharacters.map((char) => (
                   <div

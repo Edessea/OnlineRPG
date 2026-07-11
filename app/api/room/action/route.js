@@ -167,8 +167,8 @@ export async function POST(request) {
           m.sender_type === 'player'
             ? allPlayers.find((p) => p.id === m.player_id)?.name || 'Jugador'
             : m.sender_type === 'gm'
-            ? 'Game Master'
-            : 'Sistema';
+              ? 'Game Master'
+              : 'Sistema';
         return `[${sender}]: ${m.content} ${m.dice_roll ? `(Dados: ${m.dice_roll})` : ''}`;
       })
       .join('\n');
@@ -233,6 +233,10 @@ INSTRUCCIONES PARA TU RESPUESTA:
     });
 
     const systemInstruction = `Eres un Game Master y Narrador de fantasía medieval para un juego de rol de mesa interactivo. Tu prosa es rica, cautivadora y descriptiva. Debes seguir fielmente el esquema JSON y evaluar el tiro de dados para describir las consecuencias lógicas de las acciones en español.`;
+
+    console.log('--- GEMINI ACTION ROUTE PROMPT ---');
+    console.log(prompt);
+    console.log('----------------------------------');
 
     const result = await model.generateContent({
       systemInstruction: systemInstruction,

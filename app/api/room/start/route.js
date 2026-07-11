@@ -70,7 +70,6 @@ export async function POST(request) {
 
     const prompt = `
 Estás iniciando una nueva campaña de juego de rol de mesa.
-Ubicación inicial: Frente a la pesada puerta de hierro fundido decorada con runas resplandecientes de una mazmorra ancestral ancestral, bajo un cielo morado místico.
 
 NOMBRE DE LA CAMPAÑA:
 ${room.name || 'Campaña sin nombre'}
@@ -83,10 +82,9 @@ AVENTUREROS REGISTRADOS EN ESTA CAMPAÑA:
 ${playerListText}
 
 REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
-1. Escribe una introducción inmersiva de fantasía medieval en español.
-2. IMPORTANTE: Los aventureros NO SE CONOCEN entre sí. Es la primera vez que se cruzan sus miradas. Narra cómo se encuentran en este helado y ventoso paraje, mirándose mutuamente con desconfianza, curiosidad o resignación. Explica cómo la necesidad, el destino o los rumores los han reunido ante este portal común.
-3. Termina llamando al grupo a la acción y cediendo la palabra a los jugadores.
-4. Devuelve un JSON que contenga:
+1. Escribe una introducción breve pero que enganche inmediatamente a los jugadores.
+2. Termina llamando al grupo a la acción y cediendo la palabra a los jugadores.
+3. Devuelve un JSON que contenga:
    - "welcome_message": La narración literaria detallada.
    - "initial_context": Un resumen del estado inicial del quest, los jugadores presentes y su relación de extraños.
 `;
@@ -105,6 +103,10 @@ REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
     });
 
     const systemInstruction = `Eres un Game Master y Narrador de fantasía de alta calidad. Escribes en español con prosa descriptiva e inmersiva. Sigues al pie de la letra el formato JSON y la consigna de que los jugadores se conocen por primera vez.`;
+
+    console.log('--- GEMINI START ROUTE PROMPT ---');
+    console.log(prompt);
+    console.log('---------------------------------');
 
     const result = await model.generateContent({
       systemInstruction: systemInstruction,

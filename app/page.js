@@ -726,6 +726,19 @@ export default function Home() {
                     <option value="Clérigo">Clérigo</option>
                     <option value="Explorador">Explorador (Ranger)</option>
                     <option value="Bardo">Bardo</option>
+                    <option value="Rey">Rey</option>
+                    <option value="Reina">Reina</option>
+                    <option value="Bandido">Bandido</option>
+                    <option value="Mercenario">Mercenario</option>
+                    <option value="Mercader">Mercader</option>
+                    <option value="Estudiante">Estudiante</option>
+                    <option value="Ingeniero de Software">Ingeniero de Software</option>
+                    <option value="Youtuber">Youtuber</option>
+                    <option value="Hacker">Hacker</option>
+                    <option value="Astronauta">Astronauta</option>
+                    <option value="Científico">Científico</option>
+                    <option value="Oficinista">Oficinista</option>
+                    <option value="Médico">Médico</option>
                   </select>
                 </div>
               </div>

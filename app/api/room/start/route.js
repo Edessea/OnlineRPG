@@ -19,7 +19,7 @@ const responseSchema = {
 
 export async function POST(request) {
   try {
-    const { roomId } = await request.json();
+    const { roomId, userId } = await request.json();
 
     if (!roomId) {
       return NextResponse.json({ error: 'Falta el parámetro roomId.' }, { status: 400 });
@@ -36,6 +36,14 @@ export async function POST(request) {
 
     const { data: room, error: roomError } = await roomQuery.maybeSingle();
     if (roomError || !room) throw new Error('No se encontró la sala de juego.');
+
+    // Enforce campaign creator validation
+    if (room.creator_id && room.creator_id !== userId) {
+      return NextResponse.json(
+        { error: 'Solo el creador de la campaña puede iniciar la aventura.' },
+        { status: 403 }
+      );
+    }
 
     const roomUuid = room.id;
 

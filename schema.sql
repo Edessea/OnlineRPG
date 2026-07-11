@@ -1,6 +1,25 @@
--- Supabase Database Schema for Online RPG
+-- Supabase Database Schema for Online RPG v2
 
--- 1. Create rooms table
+-- 1. Create users table
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username VARCHAR(100) UNIQUE NOT NULL,
+  password VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. Create characters table
+CREATE TABLE IF NOT EXISTS characters (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  race VARCHAR(50) NOT NULL,
+  class VARCHAR(50) NOT NULL,
+  description TEXT, -- Biography/Equipment
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 3. Create rooms table
 CREATE TABLE IF NOT EXISTS rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code VARCHAR(10) UNIQUE, -- User-friendly short room code (e.g. ABCDE)
@@ -10,14 +29,17 @@ CREATE TABLE IF NOT EXISTS rooms (
   active_player_id UUID, -- References players(id). NULL when in lobby or during GM turn
   current_dice_type VARCHAR(10) DEFAULT 'D20' NOT NULL, -- Dictated by GM for next action
   victory_condition TEXT,
-  defeat_condition TEXT
+  defeat_condition TEXT,
+  creator_id UUID REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 2. Create players table
+-- 4. Create players table
 CREATE TABLE IF NOT EXISTS players (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_id UUID REFERENCES rooms(id) ON DELETE CASCADE NOT NULL,
-  session_id VARCHAR(255) NOT NULL, -- Persisted client cookie/localStorage session
+  session_id VARCHAR(255), -- Persisted client cookie/localStorage session (legacy)
+  character_id UUID REFERENCES characters(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
   name VARCHAR(100) NOT NULL,
   race VARCHAR(50) NOT NULL,
   class VARCHAR(50) NOT NULL,
@@ -25,10 +47,10 @@ CREATE TABLE IF NOT EXISTS players (
   stats JSONB DEFAULT '{"HP": 100, "Level": 1, "XP": 0}'::jsonb NOT NULL,
   join_order INT NOT NULL, -- Determined sequentially as players register (0, 1, 2...)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  UNIQUE (room_id, session_id)
+  UNIQUE (room_id, user_id)
 );
 
--- 3. Create messages table
+-- 5. Create messages table
 CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_id UUID REFERENCES rooms(id) ON DELETE CASCADE NOT NULL,
@@ -41,15 +63,28 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 4. Enable Row Level Security (RLS)
+-- 6. Enable Row Level Security (RLS)
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE characters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
--- 5. Create Permissive Policies
--- Note: If these policies already exist, they can be recreated or altered.
+-- 7. Create Permissive Policies
 DO $$
 BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'Public Read/Write Users'
+  ) THEN
+    CREATE POLICY "Public Read/Write Users" ON users FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'characters' AND policyname = 'Public Read/Write Characters'
+  ) THEN
+    CREATE POLICY "Public Read/Write Characters" ON characters FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies WHERE tablename = 'rooms' AND policyname = 'Public Read/Write Rooms'
   ) THEN
@@ -70,8 +105,7 @@ BEGIN
 END
 $$;
 
--- 6. Enable Realtime
--- Add tables to the supabase_realtime publication to enable subscriptions.
--- If the publication supabase_realtime does not exist, you can create it first:
+-- 8. Enable Realtime
+-- If the publication supabase_realtime does not exist, create it:
 -- CREATE PUBLICATION supabase_realtime;
-ALTER PUBLICATION supabase_realtime ADD TABLE rooms, players, messages;
+-- ALTER PUBLICATION supabase_realtime ADD TABLE users, characters, rooms, players, messages;

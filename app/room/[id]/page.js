@@ -30,12 +30,23 @@ export default function GameRoom() {
   // Scroll anchor for chat
   const chatEndRef = useRef(null);
 
+  const [user, setUser] = useState(null);
+
+  // Load user on mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem('rpg_user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    } else {
+      router.push('/');
+    }
+  }, [router]);
+
   // Check if player has a valid registration in this room
   useEffect(() => {
-    if (loading) return;
+    if (loading || !user) return;
 
-    const sessionId = localStorage.getItem('rpg_session_id');
-    const player = players.find((p) => p.session_id === sessionId);
+    const player = players.find((p) => p.user_id === user.id);
 
     if (!player) {
       // Redirect to character registration if not registered
@@ -44,7 +55,7 @@ export default function GameRoom() {
       setCurrentPlayer(player);
       setIsCheckingPlayer(false);
     }
-  }, [loading, players, roomId, router]);
+  }, [loading, players, roomId, router, user]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -91,7 +102,7 @@ export default function GameRoom() {
       const res = await fetch('/api/room/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId })
+        body: JSON.stringify({ roomId, userId: user?.id })
       });
 
       const data = await res.json();
@@ -333,14 +344,20 @@ export default function GameRoom() {
               <div style={styles.lobbyConsole}>
                 <h3>Lobby de Espera</h3>
                 <p>Esperando a que se unan más compañeros de juego. Actualmente hay {players.length} listos.</p>
-                <button 
-                  className="btn" 
-                  onClick={handleStartGame} 
-                  disabled={submitting || players.length === 0}
-                  style={styles.startBtn}
-                >
-                  {submitting ? 'Iniciando Aventura...' : 'Comenzar Aventura'}
-                </button>
+                {user && user.id === room.creator_id ? (
+                  <button 
+                    className="btn" 
+                    onClick={handleStartGame} 
+                    disabled={submitting || players.length === 0}
+                    style={styles.startBtn}
+                  >
+                    {submitting ? 'Iniciando Aventura...' : 'Comenzar Aventura'}
+                  </button>
+                ) : (
+                  <p style={{ fontStyle: 'italic', color: 'var(--secondary)', marginTop: '1rem' }}>
+                    Esperando a que el creador de la campaña inicie la aventura...
+                  </p>
+                )}
               </div>
             )}
 

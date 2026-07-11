@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '../../../../lib/supabaseClient';
 
@@ -9,15 +9,15 @@ export default function CharacterCreation() {
   const params = useParams();
   const roomId = params.id;
 
+  // Session & user state
+  const [user, setUser] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Form State
-  const [name, setName] = useState('');
-  const [race, setRace] = useState('Humano');
-  const [charClass, setCharClass] = useState('Guerrero');
-  const [description, setDescription] = useState('');
+  // Available user characters
+  const [userCharacters, setUserCharacters] = useState([]);
+  const [selectedCharId, setSelectedCharId] = useState(null);
 
   const getRoomUuid = async (code) => {
     const isUuid = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/.test(code);
@@ -35,90 +35,109 @@ export default function CharacterCreation() {
     return data.id;
   };
 
-  // Check if player has an existing session in this room
+  // Auth and state verification
   useEffect(() => {
     if (!roomId) return;
 
-    const checkExistingSession = async () => {
+    const verifySession = async () => {
       try {
-        let sessionId = localStorage.getItem('rpg_session_id');
-        if (!sessionId) {
-          sessionId = crypto.randomUUID();
-          localStorage.setItem('rpg_session_id', sessionId);
-          setLoadingSession(false);
+        const storedUser = localStorage.getItem('rpg_user');
+        if (!storedUser) {
+          // If not logged in, redirect to home page
+          router.push('/');
           return;
         }
 
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+
         const roomUuid = await getRoomUuid(roomId);
 
-        // Search for existing player in this room with this session_id
-        const { data: player, error: fetchError } = await supabase
+        // 1. Check if user already joined this room
+        const { data: player, error: playerErr } = await supabase
           .from('players')
           .select('id')
           .eq('room_id', roomUuid)
-          .eq('session_id', sessionId)
+          .eq('user_id', parsedUser.id)
           .maybeSingle();
 
-        if (fetchError) throw fetchError;
+        if (playerErr) throw playerErr;
 
         if (player) {
-          // Player already exists for this session, skip character creation
+          // User already joined this room, skip selection
           router.push(`/room/${roomId}`);
-        } else {
-          setLoadingSession(false);
+          return;
         }
+
+        // 2. Fetch user's characters
+        const { data: chars, error: charsErr } = await supabase
+          .from('characters')
+          .select('*')
+          .eq('user_id', parsedUser.id)
+          .order('created_at', { ascending: false });
+
+        if (charsErr) throw charsErr;
+        setUserCharacters(chars || []);
+
+        if (chars && chars.length > 0) {
+          // Default to first character
+          setSelectedCharId(chars[0].id);
+        }
+
+        setLoadingSession(false);
       } catch (err) {
-        console.error('Error al verificar sesión existente:', err);
-        setError(err.message || 'Error de conexión con el servidor. Inténtalo de nuevo.');
+        console.error('Error during character selection verification:', err);
+        setError(err.message || 'Error al conectar con la sala.');
         setLoadingSession(false);
       }
     };
 
-    checkExistingSession();
+    verifySession();
   }, [roomId, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) {
-      setError('Por favor, ingresa el nombre de tu aventurero.');
+    if (!selectedCharId) {
+      setError('Por favor selecciona un personaje.');
       return;
     }
-
     setSubmitting(true);
     setError(null);
 
     try {
-      const sessionId = localStorage.getItem('rpg_session_id');
-      if (!sessionId) throw new Error('No se encontró una sesión activa.');
-
+      if (!user) throw new Error('No hay una sesión activa.');
       const roomUuid = await getRoomUuid(roomId);
 
-      // 1. Fetch current player count to determine join_order
+      // Fetch player count for join_order
       const { count, error: countError } = await supabase
         .from('players')
         .select('*', { count: 'exact', head: true })
         .eq('room_id', roomUuid);
 
       if (countError) throw countError;
+      const joinOrder = count || 0;
 
-      // 2. Insert new player sheet
-      const newPlayer = {
-        room_id: roomUuid,
-        session_id: sessionId,
-        name: name.trim(),
-        race,
-        class: charClass,
-        description: description.trim() || 'Un misterioso viajero en busca de fortuna.',
-        stats: { HP: 100, Level: 1, XP: 0 },
-        join_order: count || 0
-      };
+      // Find selected character
+      const characterToJoin = userCharacters.find(c => c.id === selectedCharId);
+      if (!characterToJoin) throw new Error('Personaje seleccionado no encontrado.');
 
+      // Join the campaign room as player
       const { error: insertError } = await supabase
         .from('players')
-        .insert([newPlayer]);
+        .insert([{
+          room_id: roomUuid,
+          user_id: user.id,
+          character_id: characterToJoin.id,
+          name: characterToJoin.name,
+          race: characterToJoin.race,
+          class: characterToJoin.class,
+          description: characterToJoin.description || 'Un valeroso aventurero.',
+          stats: { HP: 100, Level: 1, XP: 0 },
+          join_order: joinOrder
+        }]);
 
       if (insertError) {
-        // Handle unique constraint check (if another window registered in the meantime)
+        // Unique key constraint violation: user joined in the meantime
         if (insertError.code === '23505') {
           router.push(`/room/${roomId}`);
           return;
@@ -126,11 +145,10 @@ export default function CharacterCreation() {
         throw insertError;
       }
 
-      // 3. Redirect to the main game board
       router.push(`/room/${roomId}`);
     } catch (err) {
-      console.error('Error al registrar personaje:', err);
-      setError(err.message || 'Error al guardar tu hoja de personaje. Inténtalo de nuevo.');
+      console.error('Error joining campaign:', err);
+      setError(err.message || 'Error al entrar a la sala.');
       setSubmitting(false);
     }
   };
@@ -139,7 +157,7 @@ export default function CharacterCreation() {
     return (
       <div style={styles.loadingContainer}>
         <div style={styles.spinner}>⌛</div>
-        <p style={styles.loadingText}>Consultando los pergaminos de sesión...</p>
+        <p style={styles.loadingText}>Preparando pergaminos de aventurero...</p>
       </div>
     );
   }
@@ -147,8 +165,10 @@ export default function CharacterCreation() {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h1 style={styles.title}>Hoja de Personaje</h1>
-        <p style={styles.subtitle}>Crea tu identidad para ingresar a la sala: <code style={styles.roomCode}>{roomId}</code></p>
+        <h1 style={styles.title}>Hoja de Entrada</h1>
+        <p style={styles.subtitle}>
+          Elige un aventurero para entrar a la sala: <code style={styles.roomCode}>{roomId}</code>
+        </p>
       </header>
 
       {error && (
@@ -158,97 +178,69 @@ export default function CharacterCreation() {
       )}
 
       <main className="card" style={styles.card}>
-        <form onSubmit={handleSubmit} style={styles.form}>
-          
-          {/* Name Field */}
-          <div style={styles.formGroup}>
-            <label style={styles.label} htmlFor="name">Nombre del Personaje</label>
-            <input
-              type="text"
-              id="name"
-              placeholder="Ej: Eldrin Valerius"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={styles.input}
-              maxLength={50}
-              required
-            />
-          </div>
-
-          {/* Race & Class Row */}
-          <div style={styles.row}>
-            <div style={{ ...styles.formGroup, flex: 1 }}>
-              <label style={styles.label} htmlFor="race">Raza</label>
-              <select
-                id="race"
-                value={race}
-                onChange={(e) => setRace(e.target.value)}
-                style={styles.select}
-              >
-                <option value="Humano">Humano</option>
-                <option value="Elfo">Elfo</option>
-                <option value="Enano">Enano</option>
-                <option value="Orco">Orco</option>
-                <option value="Mediano">Mediano (Halfling)</option>
-                <option value="Dracónido">Dracónido</option>
-              </select>
-            </div>
-
-            <div style={{ ...styles.formGroup, flex: 1 }}>
-              <label style={styles.label} htmlFor="class">Clase</label>
-              <select
-                id="class"
-                value={charClass}
-                onChange={(e) => setCharClass(e.target.value)}
-                style={styles.select}
-              >
-                <option value="Guerrero">Guerrero</option>
-                <option value="Mago">Mago</option>
-                <option value="Pícaro">Pícaro (Rogue)</option>
-                <option value="Clérigo">Clérigo</option>
-                <option value="Explorador">Explorador (Ranger)</option>
-                <option value="Bardo">Bardo</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Biography & Backstory */}
-          <div style={styles.formGroup}>
-            <label style={styles.label} htmlFor="description">Historia & Descripción</label>
-            <textarea
-              id="description"
-              placeholder="Describe su trasfondo, apariencia o motivaciones..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              style={styles.textarea}
-              maxLength={500}
-            />
-          </div>
-
-          {/* Submit & Back Buttons */}
-          <div style={styles.actionsRow}>
+        {userCharacters.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+            <p style={{ color: 'var(--secondary)', marginBottom: '2rem', lineHeight: '1.6' }}>
+              No tienes personajes creados en este ordenador. 
+              <br />
+              Por favor, regresa a la posada principal y forja a tu primer héroe antes de unirse a esta campaña.
+            </p>
             <button
               type="button"
               onClick={() => router.push('/')}
-              className="btn exit-btn"
-              style={styles.backBtn}
-            >
-              Volver
-            </button>
-            <button
-              type="submit"
               className="btn"
-              disabled={submitting}
-              style={styles.submitBtn}
+              style={{ width: '100%' }}
             >
-              {submitting ? 'Forjando personaje...' : 'Entrar a la Sala de Juego'}
+              Volver a la Posada
             </button>
           </div>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit} style={styles.form}>
+            {/* Character Selection Grid */}
+            <div>
+              <label style={styles.label}>Selecciona tu personaje para esta partida</label>
+              <div className="char-selection-grid">
+                {userCharacters.map((char) => (
+                  <div
+                    key={char.id}
+                    className={`selection-char-card ${selectedCharId === char.id ? 'selected' : ''}`}
+                    onClick={() => setSelectedCharId(char.id)}
+                  >
+                    <div style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>
+                      {char.class === 'Mago' ? '🧙' : char.class === 'Guerrero' ? '⚔️' : char.class === 'Pícaro' ? '🗡️' : '🛡️'}
+                    </div>
+                    <span style={{ fontWeight: 'bold', display: 'block' }}>{char.name}</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--secondary)' }}>{char.race} • {char.class}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Submit & Back Buttons */}
+            <div style={styles.actionsRow}>
+              <button
+                type="button"
+                onClick={() => router.push('/')}
+                className="btn exit-btn"
+                style={styles.backBtn}
+              >
+                Volver
+              </button>
+              <button
+                type="submit"
+                className="btn"
+                disabled={submitting}
+                style={styles.submitBtn}
+              >
+                {submitting ? 'Conectando...' : 'Entrar con Personaje'}
+              </button>
+            </div>
+          </form>
+        )}
       </main>
 
       <footer style={styles.footer}>
-        <p>Tu progreso de personaje se guardará localmente en este navegador.</p>
+        <p>Tu progreso de personaje se guardará en tu cuenta de RPG Online.</p>
       </footer>
     </div>
   );
@@ -330,6 +322,7 @@ const styles = {
     fontSize: '0.95rem',
     outline: 'none',
     cursor: 'pointer',
+    width: '100%'
   },
   textarea: {
     padding: '0.8rem 1rem',

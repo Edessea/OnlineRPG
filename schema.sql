@@ -30,7 +30,9 @@ CREATE TABLE IF NOT EXISTS rooms (
   current_dice_type VARCHAR(10) DEFAULT 'D20' NOT NULL, -- Dictated by GM for next action
   victory_condition TEXT,
   defeat_condition TEXT,
-  creator_id UUID REFERENCES users(id) ON DELETE SET NULL
+  creator_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  description TEXT,
+  name VARCHAR(255)
 );
 
 -- 4. Create players table

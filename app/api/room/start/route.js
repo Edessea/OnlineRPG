@@ -72,6 +72,13 @@ export async function POST(request) {
 Estás iniciando una nueva campaña de juego de rol de mesa.
 Ubicación inicial: Frente a la pesada puerta de hierro fundido decorada con runas resplandecientes de una mazmorra ancestral ancestral, bajo un cielo morado místico.
 
+NOMBRE DE LA CAMPAÑA:
+${room.name || 'Campaña sin nombre'}
+
+TRASFONDO / DESCRIPCIÓN GLOBAL DE LA CAMPAÑA:
+${room.description || 'No se ha provisto un trasfondo específico. Diseña una mazmorra de fantasía medieval estándar.'}
+(Nota para el GM: Esta descripción global sirve de guía general para la trama de la campaña, pero eres libre de introducir giros argumentales, sorpresas o adiciones secretas más adelante).
+
 AVENTUREROS REGISTRADOS EN ESTA CAMPAÑA:
 ${playerListText}
 

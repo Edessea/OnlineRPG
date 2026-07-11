@@ -29,6 +29,11 @@ export default function Home() {
   const [creatingChar, setCreatingChar] = useState(false);
   const [newCharError, setNewCharError] = useState(null);
 
+  // Campaign Creation modal state
+  const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
+  const [createRoomName, setCreateRoomName] = useState('');
+  const [createRoomDesc, setCreateRoomDesc] = useState('');
+
   // Room Join code state
   const [codeDigits, setCodeDigits] = useState(['', '', '', '', '']);
   const [focusedIndex, setFocusedIndex] = useState(null);
@@ -77,6 +82,7 @@ export default function Home() {
             status,
             created_at,
             creator_id,
+            name,
             players(id),
             messages(created_at)
           )
@@ -102,6 +108,7 @@ export default function Home() {
           return {
             id: roomItem.id,
             code: roomItem.code,
+            name: roomItem.name,
             status: roomItem.status,
             creator_id: roomItem.creator_id,
             players: roomItem.players || [],
@@ -223,21 +230,33 @@ export default function Home() {
     return codeMatch ? codeMatch[0].toUpperCase() : null;
   };
 
-  const handleCreateRoom = async () => {
+  const handleCreateRoom = async (e) => {
+    if (e) e.preventDefault();
     if (!user) return;
+    if (!createRoomName.trim()) {
+      setError('Por favor escribe un nombre para la campaña.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const roomCode = generateRoomCode();
       const { data, error: insertError } = await supabase
         .from('rooms')
-        .insert([{ status: 'lobby', code: roomCode, creator_id: user.id }])
+        .insert([{ 
+          status: 'lobby', 
+          code: roomCode, 
+          creator_id: user.id,
+          name: createRoomName.trim(),
+          description: createRoomDesc.trim() || null
+        }])
         .select()
         .single();
 
       if (insertError) throw insertError;
       if (!data) throw new Error('No se pudo crear la sala.');
 
+      setShowCreateRoomModal(false);
       router.push(`/room/${roomCode}/character`);
     } catch (err) {
       console.error('Error al crear la sala:', err);
@@ -533,8 +552,11 @@ export default function Home() {
               {activeRooms.map((campaign) => (
                 <div key={campaign.id} className="room-card" style={{ margin: 0 }}>
                   <div className="room-card-info">
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <span className="room-card-code">{campaign.code}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '1.15rem', fontWeight: '700', color: 'var(--foreground)' }}>
+                        {campaign.name || 'Campaña sin nombre'}
+                      </span>
+                      <span className="room-card-code" style={{ padding: '0.1rem 0.4rem', fontSize: '0.75rem', margin: 0 }}>{campaign.code}</span>
                       {campaign.creator_id === user.id && (
                         <span className="creator-badge" title="Tú creaste esta campaña">Creador</span>
                       )}
@@ -579,7 +601,10 @@ export default function Home() {
           </div>
           <button 
             className="btn" 
-            onClick={handleCreateRoom} 
+            onClick={() => {
+              setCreateRoomDesc('');
+              setShowCreateRoomModal(true);
+            }}
             disabled={loading}
           >
             {loading ? 'Invocando portal...' : 'Iniciar Nueva Campaña'}
@@ -736,6 +761,66 @@ export default function Home() {
                   style={{ flex: 2 }}
                 >
                   {creatingChar ? 'Creando personaje...' : 'Forjar Personaje'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Campaign Creation Modal */}
+      {showCreateRoomModal && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h2 className="modal-title">🏰 Iniciar Nueva Campaña</h2>
+            </div>
+            
+            <form onSubmit={handleCreateRoom} style={styles.form}>
+              <div style={styles.formGroup}>
+                <label style={styles.label} htmlFor="campaignName">Nombre de la Campaña</label>
+                <input
+                  id="campaignName"
+                  type="text"
+                  value={createRoomName}
+                  onChange={(e) => setCreateRoomName(e.target.value)}
+                  style={styles.input}
+                  placeholder="Ej: Las Crónicas del Templo Hundido"
+                  maxLength={100}
+                  required
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label} htmlFor="campaignDesc">Trasfondo / Descripción Global de la Campaña</label>
+                <textarea
+                  id="campaignDesc"
+                  value={createRoomDesc}
+                  onChange={(e) => setCreateRoomDesc(e.target.value)}
+                  style={{ ...styles.input, minHeight: '120px', resize: 'vertical' }}
+                  placeholder="Describe el trasfondo de la campaña (ej: Un grupo de exploradores investiga el misterioso Templo Hundido en busca de la corona de la tormenta...)"
+                  maxLength={500}
+                />
+                <p style={{ color: 'var(--secondary)', fontSize: '0.82rem', marginTop: '0.2rem', lineHeight: '1.4' }}>
+                  💡 <em>Esta descripción guiará a la Inteligencia Artificial (GM) para dirigir el juego. No debe contener información secreta (todos los jugadores podrán leerla en el menú Trasfondo) para asegurar que el creador no tenga ventajas.</em>
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowCreateRoomModal(false)}
+                  className="btn exit-btn"
+                  style={{ flex: 1 }}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn" 
+                  disabled={loading}
+                  style={{ flex: 2 }}
+                >
+                  {loading ? 'Invocando portal...' : 'Crear Campaña'}
                 </button>
               </div>
             </form>

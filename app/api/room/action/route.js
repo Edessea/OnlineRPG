@@ -174,6 +174,13 @@ export async function POST(request) {
       .join('\n');
 
     const prompt = `
+NOMBRE DE LA CAMPAÑA:
+${room.name || 'Campaña sin nombre'}
+
+DESCRIPCIÓN GLOBAL DE LA CAMPAÑA (TRASFONDO):
+${room.description || 'No se ha provisto un trasfondo específico. Mazmorra medieval estándar.'}
+(Nota para el GM: Esta descripción global sirve de guía general para la trama, pero eres libre de introducir giros argumentales, sorpresas o adiciones secretas).
+
 HISTORIAL DE MEMORIA DEL NARRADOR (GM CONTEXT):
 ${room.gm_context || 'Inicio del viaje a las puertas de la mazmorra ancestral.'}
 

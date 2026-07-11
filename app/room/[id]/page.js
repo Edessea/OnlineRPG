@@ -21,6 +21,9 @@ export default function GameRoom() {
   const [actionLockedText, setActionLockedText] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Campaign Description modal state
+  const [showDescModal, setShowDescModal] = useState(false);
+
   // Character Detail Modal
   const [modalPlayer, setModalPlayer] = useState(null);
 
@@ -183,14 +186,22 @@ export default function GameRoom() {
       {/* Header */}
       <header style={styles.header}>
         <div style={styles.headerTitleContainer}>
-          <h1 style={styles.headerTitle}>RPG Online</h1>
-          <span style={styles.headerRoomId}>Sala: {room?.code || roomId}</span>
+          <h1 style={styles.headerTitle}>{room?.name || 'Campaña sin nombre'}</h1>
+          <span style={styles.headerRoomId}>Código: {room?.code || roomId}</span>
         </div>
         <div style={styles.headerStatus}>
           <span style={room.status === 'lobby' ? styles.statusLobby : styles.statusPlaying}>
             ● {room.status === 'lobby' ? 'Lobby Abierto' : 'Campaña Iniciada'}
           </span>
           <span style={styles.playerCount}>{players.length} Aventureros</span>
+          <button
+            type="button"
+            onClick={() => setShowDescModal(true)}
+            className="btn enter-btn"
+            style={{ marginRight: '0.5rem' }}
+          >
+            📜 Trasfondo
+          </button>
           <button
             type="button"
             onClick={() => router.push('/')}
@@ -342,7 +353,7 @@ export default function GameRoom() {
             {/* If in Lobby State */}
             {room.status === 'lobby' && (
               <div style={styles.lobbyConsole}>
-                <h3>Lobby de Espera</h3>
+                <h3>Lobby: {room?.name || 'Campaña sin nombre'}</h3>
                 <p>Esperando a que se unan más compañeros de juego. Actualmente hay {players.length} listos.</p>
                 {user && user.id === room.creator_id ? (
                   <button 
@@ -524,6 +535,34 @@ export default function GameRoom() {
             </div>
 
             <button className="btn" onClick={() => setModalPlayer(null)} style={styles.modalCloseBtn}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Campaign Premise Modal */}
+      {showDescModal && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h2 className="modal-title">📜 Trasfondo: {room?.name || 'Campaña sin nombre'}</h2>
+            </div>
+            
+            <div style={{ padding: '0.5rem 0' }}>
+              <p style={{ color: 'var(--foreground)', fontSize: '1rem', lineHeight: '1.6', whiteSpace: 'pre-wrap', margin: 0 }}>
+                {room?.description || 'Esta campaña no tiene un trasfondo inicial especificado.'}
+              </p>
+              <p style={{ color: 'var(--secondary)', fontSize: '0.82rem', marginTop: '1.5rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem', lineHeight: '1.4' }}>
+                💡 <em>Este trasfondo sirve como la descripción de partida abierta visible para todos los héroes. No contiene información secreta para asegurar un juego justo.</em>
+              </p>
+            </div>
+
+            <button 
+              className="btn" 
+              onClick={() => setShowDescModal(false)}
+              style={{ marginTop: '0.5rem', width: '100%' }}
+            >
               Cerrar
             </button>
           </div>

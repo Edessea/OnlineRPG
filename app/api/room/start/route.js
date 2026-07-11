@@ -64,7 +64,7 @@ export async function POST(request) {
     const playerListText = players
       .map(
         (p) =>
-          `- ${p.name} (Raza: ${p.race}, Clase: ${p.class}). Trasfondo: ${p.description || 'Un guerrero misterioso.'}`
+          `- ${p.name} (Raza: ${p.race}, Clase: ${p.class}, Fuerza: ${p.fuerza ?? 10}, Destreza: ${p.destreza ?? 10}, Magia: ${p.magia ?? 10}, Salud: ${p.salud ?? 10}, Carisma: ${p.carisma ?? 10}, Inteligencia: ${p.inteligencia ?? 10}, Habilidades: [${(p.skills || []).join(', ')}]). Trasfondo: ${p.description || 'Un guerrero misterioso.'}`
       )
       .join('\n');
 

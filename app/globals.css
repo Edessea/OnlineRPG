@@ -449,9 +449,11 @@ a:hover {
   background-color: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(4px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 1000;
+  overflow-y: auto;
+  padding: 2rem 1rem;
 }
 
 .modal-card {
@@ -465,6 +467,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  margin: auto;
 }
 
 .modal-header {
@@ -517,6 +520,15 @@ a:hover {
   font-weight: 600;
   margin-left: 0.5rem;
   text-transform: uppercase;
+}
+
+@keyframes bounceRoll {
+  0% { transform: translateY(0) rotate(0deg); }
+  20% { transform: translateY(-12px) rotate(72deg); }
+  40% { transform: translateY(-16px) rotate(144deg); }
+  60% { transform: translateY(-8px) rotate(216deg); }
+  80% { transform: translateY(-12px) rotate(288deg); }
+  100% { transform: translateY(0) rotate(360deg); }
 }
 
 

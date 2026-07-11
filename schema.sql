@@ -16,7 +16,14 @@ CREATE TABLE IF NOT EXISTS characters (
   race VARCHAR(50) NOT NULL,
   class VARCHAR(50) NOT NULL,
   description TEXT, -- Biography/Equipment
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  fuerza INTEGER,
+  destreza INTEGER,
+  magia INTEGER,
+  salud INTEGER,
+  carisma INTEGER,
+  inteligencia INTEGER,
+  skills JSONB
 );
 
 -- 3. Create rooms table
@@ -49,6 +56,13 @@ CREATE TABLE IF NOT EXISTS players (
   stats JSONB DEFAULT '{"HP": 100, "Level": 1, "XP": 0}'::jsonb NOT NULL,
   join_order INT NOT NULL, -- Determined sequentially as players register (0, 1, 2...)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  fuerza INTEGER,
+  destreza INTEGER,
+  magia INTEGER,
+  salud INTEGER,
+  carisma INTEGER,
+  inteligencia INTEGER,
+  skills JSONB,
   UNIQUE (room_id, user_id)
 );
 

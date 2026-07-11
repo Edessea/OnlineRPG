@@ -132,7 +132,14 @@ export default function CharacterCreation() {
           race: characterToJoin.race,
           class: characterToJoin.class,
           description: characterToJoin.description || 'Un valeroso aventurero.',
-          stats: { HP: 100, Level: 1, XP: 0 },
+          stats: { HP: characterToJoin.salud || 100, Level: 1, XP: 0 },
+          fuerza: characterToJoin.fuerza || 10,
+          destreza: characterToJoin.destreza || 10,
+          magia: characterToJoin.magia || 10,
+          salud: characterToJoin.salud || 10,
+          carisma: characterToJoin.carisma || 10,
+          inteligencia: characterToJoin.inteligencia || 10,
+          skills: characterToJoin.skills || [],
           join_order: joinOrder
         }]);
 

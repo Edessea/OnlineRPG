@@ -523,11 +523,36 @@ export default function GameRoom() {
             <div style={styles.modalSection}>
               <h4>Estadísticas</h4>
               <ul style={styles.modalList}>
-                <li><strong>Vida (HP):</strong> {modalPlayer.stats?.HP ?? 100} / 100</li>
+                <li><strong>Vida (HP):</strong> {modalPlayer.stats?.HP ?? 100} / {modalPlayer.salud ?? 100}</li>
                 <li><strong>Nivel (Level):</strong> {modalPlayer.stats?.Level ?? 1}</li>
                 <li><strong>Experiencia (XP):</strong> {modalPlayer.stats?.XP ?? 0}</li>
               </ul>
             </div>
+
+            <div style={styles.modalSection}>
+              <h4>Atributos</h4>
+              <ul style={styles.modalList}>
+                <li><strong>💪 Fuerza:</strong> {modalPlayer.fuerza ?? 10}</li>
+                <li><strong>🏹 Destreza:</strong> {modalPlayer.destreza ?? 10}</li>
+                <li><strong>✨ Magia:</strong> {modalPlayer.magia ?? 10}</li>
+                <li><strong>❤️ Salud (Máx HP):</strong> {modalPlayer.salud ?? 10}</li>
+                <li><strong>🗣️ Carisma:</strong> {modalPlayer.carisma ?? 10}</li>
+                <li><strong>🧠 Inteligencia:</strong> {modalPlayer.inteligencia ?? 10}</li>
+              </ul>
+            </div>
+
+            {modalPlayer.skills && modalPlayer.skills.length > 0 && (
+              <div style={styles.modalSection}>
+                <h4>Habilidades</h4>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                  {modalPlayer.skills.map((skill, sIdx) => (
+                    <span key={sIdx} className="creator-badge" style={{ background: '#1e293b', border: '1px solid var(--border)', textTransform: 'none', fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginLeft: 0 }}>
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div style={styles.modalSection}>
               <h4>Historia y Trasfondo</h4>

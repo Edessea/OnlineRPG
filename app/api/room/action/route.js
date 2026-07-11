@@ -157,7 +157,7 @@ export async function POST(request) {
     const playerListText = allPlayers
       .map(
         (p) =>
-          `- ID: "${p.id}", Nombre: "${p.name}", Raza: "${p.race}", Clase: "${p.class}", HP: ${p.stats?.HP ?? 100}, Nivel: ${p.stats?.Level ?? 1}, XP: ${p.stats?.XP ?? 0}, Orden de unión: ${p.join_order}`
+          `- ID: "${p.id}", Nombre: "${p.name}", Raza: "${p.race}", Clase: "${p.class}", HP: ${p.stats?.HP ?? 100}/${p.salud ?? 100}, Nivel: ${p.stats?.Level ?? 1}, XP: ${p.stats?.XP ?? 0}, Fuerza: ${p.fuerza ?? 10}, Destreza: ${p.destreza ?? 10}, Magia: ${p.magia ?? 10}, Carisma: ${p.carisma ?? 10}, Inteligencia: ${p.inteligencia ?? 10}, Habilidades: [${(p.skills || []).join(', ')}], Orden de unión: ${p.join_order}`
       )
       .join('\n');
 

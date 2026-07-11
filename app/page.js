@@ -4,6 +4,15 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
 
+const ALL_SKILLS = [
+  "Acrobacia", "Atletismo", "Arcano", "Sigilo", "Supervivencia",
+  "Persuasión", "Intimidación", "Medicina", "Programación en Python", "Hacking de Terminales",
+  "Redes Sociales", "Canto Lírico", "Negociación Comercial", "Alquimia", "Robótica",
+  "Pilotaje de Naves", "Astrodinámica", "Cerrajería", "Juego de Manos", "Análisis de Datos",
+  "Liderazgo Real", "Supervivencia Urbana", "Primeros Auxilios", "Combate con Armas Cortas", "Engaño",
+  "Criptografía", "Historia Antigua", "Cocina Rápida", "Contabilidad", "Oratoria Pública"
+];
+
 export default function Home() {
   const router = useRouter();
   
@@ -28,6 +37,28 @@ export default function Home() {
   const [newCharDesc, setNewCharDesc] = useState('');
   const [creatingChar, setCreatingChar] = useState(false);
   const [newCharError, setNewCharError] = useState(null);
+
+  // Draggable stats states
+  const [rolledDice, setRolledDice] = useState([]);
+  const [isRolling, setIsRolling] = useState(false);
+  const [rolledSkills, setRolledSkills] = useState([]);
+  const [hasRolled, setHasRolled] = useState(false);
+  const [assignedStats, setAssignedStats] = useState({
+    fuerza: null,
+    destreza: null,
+    magia: null,
+    salud: null,
+    carisma: null,
+    inteligencia: null
+  });
+  const [assignedDiceIndexes, setAssignedDiceIndexes] = useState({
+    fuerza: -1,
+    destreza: -1,
+    magia: -1,
+    salud: -1,
+    carisma: -1,
+    inteligencia: -1
+  });
 
   // Campaign Creation modal state
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
@@ -316,10 +347,102 @@ export default function Home() {
     router.push(`/room/${code}/character`);
   };
 
+  const handleDragStart = (e, index, value) => {
+    e.dataTransfer.setData('diceIndex', index.toString());
+    e.dataTransfer.setData('diceValue', value.toString());
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e, statName) => {
+    e.preventDefault();
+    const diceIndex = parseInt(e.dataTransfer.getData('diceIndex'), 10);
+    const diceValue = parseInt(e.dataTransfer.getData('diceValue'), 10);
+    
+    const newAssignedIndexes = { ...assignedDiceIndexes };
+    const newAssignedStats = { ...assignedStats };
+    
+    Object.keys(newAssignedIndexes).forEach(key => {
+      if (newAssignedIndexes[key] === diceIndex) {
+        newAssignedIndexes[key] = -1;
+        newAssignedStats[key] = null;
+      }
+    });
+    
+    newAssignedIndexes[statName] = diceIndex;
+    newAssignedStats[statName] = diceValue;
+    
+    setAssignedDiceIndexes(newAssignedIndexes);
+    setAssignedStats(newAssignedStats);
+  };
+
+  const handleResetDistribution = () => {
+    setAssignedStats({
+      fuerza: null,
+      destreza: null,
+      magia: null,
+      salud: null,
+      carisma: null,
+      inteligencia: null
+    });
+    setAssignedDiceIndexes({
+      fuerza: -1,
+      destreza: -1,
+      magia: -1,
+      salud: -1,
+      carisma: -1,
+      inteligencia: -1
+    });
+  };
+
+  const handleOpenCharModal = () => {
+    setNewCharName('');
+    setNewCharDesc('');
+    setNewCharRace('Humano');
+    setNewCharClass('Guerrero');
+    setRolledDice([]);
+    setRolledSkills([]);
+    handleResetDistribution();
+    setHasRolled(false);
+    setNewCharError(null);
+    setShowCharModal(true);
+  };
+
+  const handleCloseCharModal = () => {
+    setShowCharModal(false);
+    setNewCharError(null);
+    setRolledDice([]);
+    setRolledSkills([]);
+    handleResetDistribution();
+    setHasRolled(false);
+  };
+
+  const handleRollStats = () => {
+    if (hasRolled) return;
+    setIsRolling(true);
+    const diceResults = Array.from({ length: 6 }, () => Math.floor(Math.random() * 20) + 1);
+    const shuffledSkills = [...ALL_SKILLS].sort(() => 0.5 - Math.random());
+    const selectedSkills = shuffledSkills.slice(0, 3);
+    
+    setTimeout(() => {
+      setRolledDice(diceResults);
+      setRolledSkills(selectedSkills);
+      handleResetDistribution();
+      setIsRolling(false);
+      setHasRolled(true);
+    }, 1200);
+  };
+
   const handleCreateCharacter = async (e) => {
     e.preventDefault();
     if (!newCharName.trim()) {
       setNewCharError('El nombre es obligatorio.');
+      return;
+    }
+    if (rolledDice.length === 0 || Object.values(assignedStats).some(v => v === null)) {
+      setNewCharError('Debes tirar los dados y asignar todas las características.');
       return;
     }
     setCreatingChar(true);
@@ -332,7 +455,14 @@ export default function Home() {
           name: newCharName.trim(),
           race: newCharRace,
           class: newCharClass,
-          description: newCharDesc.trim()
+          description: newCharDesc.trim(),
+          fuerza: assignedStats.fuerza,
+          destreza: assignedStats.destreza,
+          magia: assignedStats.magia,
+          salud: assignedStats.salud,
+          carisma: assignedStats.carisma,
+          inteligencia: assignedStats.inteligencia,
+          skills: rolledSkills
         }])
         .select()
         .single();
@@ -343,6 +473,10 @@ export default function Home() {
       setShowCharModal(false);
       setNewCharName('');
       setNewCharDesc('');
+      setRolledDice([]);
+      setRolledSkills([]);
+      handleResetDistribution();
+      setHasRolled(false);
     } catch (err) {
       console.error(err);
       setNewCharError(err.message || 'Error al crear el personaje.');
@@ -492,7 +626,7 @@ export default function Home() {
           <div className="dashboard-column-header">
             <h2 className="dashboard-column-title">🛡️ Mis Personajes</h2>
             <button 
-              onClick={() => setShowCharModal(true)} 
+              onClick={handleOpenCharModal} 
               className="btn enter-btn"
             >
               + Nuevo
@@ -505,7 +639,7 @@ export default function Home() {
             <div className="empty-rooms-card" style={{ padding: '2rem' }}>
               <p style={{ marginBottom: '1rem' }}>Aún no tienes personajes creados.</p>
               <button 
-                onClick={() => setShowCharModal(true)} 
+                onClick={handleOpenCharModal} 
                 className="btn"
               >
                 Crear tu primer personaje
@@ -755,13 +889,181 @@ export default function Home() {
                 />
               </div>
 
+              {/* Stats Rolling Zone */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginTop: '1rem' }}>
+                <h3 style={styles.label}>Estadísticas y Habilidades</h3>
+                <p style={{ color: 'var(--secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                  Lanza 6 dados de 20 y arrastra cada valor a una característica para definir tu fuerza, destreza, magia, salud, carisma e inteligencia.
+                </p>
+
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleRollStats}
+                    className="btn enter-btn"
+                    disabled={isRolling || hasRolled}
+                  >
+                    {isRolling ? 'Tirando dados...' : hasRolled ? 'Dados Lanzados' : '🎲 Tirar Dados'}
+                  </button>
+                  {rolledDice.length > 0 && !isRolling && (
+                    <button
+                      type="button"
+                      onClick={handleResetDistribution}
+                      className="btn logout-btn"
+                      style={{ padding: '0.4rem 1rem' }}
+                    >
+                      Reiniciar Asignación
+                    </button>
+                  )}
+                </div>
+
+                {/* Dice Animation / List */}
+                {isRolling ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', padding: '1.5rem 0' }}>
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div
+                        key={i}
+                        style={{
+                          width: '3.5rem',
+                          height: '3.5rem',
+                          background: 'linear-gradient(135deg, var(--accent), #4f46e5)',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '8px',
+                          fontSize: '1.4rem',
+                          fontWeight: 'bold',
+                          animation: `bounceRoll ${0.4 + i * 0.1}s infinite ease-in-out`,
+                          boxShadow: '0 4px 10px rgba(99, 102, 241, 0.4)'
+                        }}
+                      >
+                        D20
+                      </div>
+                    ))}
+                  </div>
+                ) : rolledDice.length > 0 ? (
+                  <div>
+                    {/* Draggable Dice Row */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label style={{ ...styles.label, fontSize: '0.85rem', color: 'var(--secondary)' }}>Dados Disponibles (Arrastra a las casillas de abajo):</label>
+                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem', minHeight: '4.5rem', padding: '0.5rem', backgroundColor: '#0a0e17', borderRadius: '6px', border: '1px dashed var(--border)', alignItems: 'center' }}>
+                        {rolledDice.map((val, idx) => {
+                          const isAssigned = Object.values(assignedDiceIndexes).includes(idx);
+                          return (
+                            <div
+                              key={idx}
+                              draggable={!isAssigned}
+                              onDragStart={(e) => handleDragStart(e, idx, val)}
+                              style={{
+                                width: '3.2rem',
+                                height: '3.2rem',
+                                background: isAssigned ? '#1e293b' : 'linear-gradient(135deg, var(--accent), #4f46e5)',
+                                color: isAssigned ? 'var(--secondary)' : '#ffffff',
+                                opacity: isAssigned ? 0.35 : 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '6px',
+                                fontSize: '1.25rem',
+                                fontWeight: 'bold',
+                                cursor: isAssigned ? 'not-allowed' : 'grab',
+                                boxShadow: isAssigned ? 'none' : '0 3px 6px rgba(0,0,0,0.3)',
+                                transition: 'all 0.2s ease',
+                                border: isAssigned ? '1px solid var(--border)' : 'none'
+                              }}
+                            >
+                              {val}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Drag-and-Drop Target Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                      {[
+                        { name: 'fuerza', label: '💪 Fuerza' },
+                        { name: 'destreza', label: '🏹 Destreza' },
+                        { name: 'magia', label: '✨ Magia' },
+                        { name: 'salud', label: '❤️ Salud (HP Inicial)' },
+                        { name: 'carisma', label: '🗣️ Carisma' },
+                        { name: 'inteligencia', label: '🧠 Inteligencia' }
+                      ].map((stat) => {
+                        const val = assignedStats[stat.name];
+                        return (
+                          <div
+                            key={stat.name}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, stat.name)}
+                            style={{
+                              border: '1px solid var(--border)',
+                              borderRadius: '6px',
+                              padding: '0.8rem 1rem',
+                              backgroundColor: val ? 'rgba(99, 102, 241, 0.05)' : '#0d1424',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              minHeight: '3.2rem',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>{stat.label}</span>
+                            <div
+                              style={{
+                                width: '2.8rem',
+                                height: '2.8rem',
+                                border: val ? 'none' : '1px dashed var(--border)',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1.1rem',
+                                fontWeight: 'bold',
+                                backgroundColor: val ? 'var(--accent)' : 'transparent',
+                                color: val ? '#ffffff' : 'var(--secondary)'
+                              }}
+                            >
+                              {val || ''}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Rolled Skills Display */}
+                    {rolledSkills.length > 0 && (
+                      <div style={{ backgroundColor: 'rgba(99, 102, 241, 0.08)', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem', marginBottom: '1.5rem' }}>
+                        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', color: 'var(--accent)' }}>✨ Habilidades Obtenidas (3 de 30 aleatorias):</h4>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                          {rolledSkills.map((sk, index) => (
+                            <span
+                              key={index}
+                              className="creator-badge"
+                              style={{
+                                background: '#1e293b',
+                                border: '1px solid var(--border)',
+                                textTransform: 'none',
+                                fontSize: '0.82rem',
+                                padding: '0.25rem 0.6rem',
+                                marginLeft: 0,
+                                borderRadius: '4px'
+                              }}
+                            >
+                              {sk}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button 
                   type="button" 
-                  onClick={() => {
-                    setShowCharModal(false);
-                    setNewCharError(null);
-                  }}
+                  onClick={handleCloseCharModal}
                   className="btn exit-btn"
                   style={{ flex: 1 }}
                 >
@@ -770,7 +1072,7 @@ export default function Home() {
                 <button 
                   type="submit" 
                   className="btn" 
-                  disabled={creatingChar}
+                  disabled={creatingChar || rolledDice.length === 0 || Object.values(assignedStats).some(v => v === null)}
                   style={{ flex: 2 }}
                 >
                   {creatingChar ? 'Creando personaje...' : 'Forjar Personaje'}

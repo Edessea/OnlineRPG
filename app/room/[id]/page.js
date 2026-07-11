@@ -180,6 +180,13 @@ export default function GameRoom() {
             ● {room.status === 'lobby' ? 'Lobby Abierto' : 'Aventura Iniciada'}
           </span>
           <span style={styles.playerCount}>{players.length} Aventureros</span>
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="btn exit-btn"
+          >
+            Salir al Home
+          </button>
         </div>
       </header>
 

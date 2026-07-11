@@ -225,15 +225,25 @@ export default function CharacterCreation() {
             />
           </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            className="btn"
-            disabled={submitting}
-            style={styles.submitBtn}
-          >
-            {submitting ? 'Forjando personaje...' : 'Entrar a la Sala de Juego'}
-          </button>
+          {/* Submit & Back Buttons */}
+          <div style={styles.actionsRow}>
+            <button
+              type="button"
+              onClick={() => router.push('/')}
+              className="btn exit-btn"
+              style={styles.backBtn}
+            >
+              Volver
+            </button>
+            <button
+              type="submit"
+              className="btn"
+              disabled={submitting}
+              style={styles.submitBtn}
+            >
+              {submitting ? 'Forjando personaje...' : 'Entrar a la Sala de Juego'}
+            </button>
+          </div>
         </form>
       </main>
 
@@ -333,9 +343,17 @@ const styles = {
     resize: 'vertical',
     fontFamily: 'var(--font-sans)',
   },
-  submitBtn: {
-    marginTop: '1rem',
+  actionsRow: {
+    display: 'flex',
+    gap: '1rem',
+    marginTop: '1.5rem',
     width: '100%',
+  },
+  backBtn: {
+    flex: 1,
+  },
+  submitBtn: {
+    flex: 2,
   },
   errorBanner: {
     backgroundColor: 'rgba(184, 92, 92, 0.15)',

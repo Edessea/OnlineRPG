@@ -108,3 +108,136 @@ a:hover {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
+
+/* Active Rooms List styling */
+.active-rooms-section {
+  margin-top: 3rem;
+  width: 100%;
+}
+
+.active-rooms-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.75rem;
+}
+
+.active-rooms-title {
+  font-size: 1.8rem;
+  margin: 0;
+  font-weight: 700;
+}
+
+.refresh-btn {
+  background-color: transparent;
+  border: 1px solid var(--border);
+  color: var(--secondary);
+  padding: 0.4rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--foreground);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rooms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.room-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.room-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+}
+
+.room-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.room-card-code {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.room-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+}
+
+.room-status-lobby {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.room-status-playing {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.room-card-players {
+  color: var(--secondary);
+}
+
+.enter-btn {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.85rem !important;
+  box-shadow: none !important;
+}
+
+.empty-rooms-card {
+  background: var(--card-bg);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 2.5rem;
+  text-align: center;
+  color: var(--secondary);
+  width: 100%;
+}
+
+.exit-btn {
+  padding: 0.4rem 0.9rem !important;
+  font-size: 0.85rem !important;
+  background-color: #1e293b !important;
+  border: 1px solid var(--border) !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+}
+
+.exit-btn:hover {
+  background-color: #e11d48 !important;
+  border-color: #e11d48 !important;
+  color: #ffffff !important;
+}
+

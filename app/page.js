@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
 
@@ -10,6 +10,80 @@ export default function Home() {
   const [focusedIndex, setFocusedIndex] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [activeRooms, setActiveRooms] = useState([]);
+  const [fetchingRooms, setFetchingRooms] = useState(true);
+
+  const formatLastActivity = (dateVal) => {
+    if (!dateVal) return 'Sin actividad';
+    const date = new Date(dateVal);
+    const now = new Date();
+    
+    const isSameDay = date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+      
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}`;
+
+    if (isSameDay) {
+      return `Hoy a las ${timeStr}`;
+    } else if (isYesterday) {
+      return `Ayer a las ${timeStr}`;
+    } else {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      return `${day}/${month} a las ${timeStr}`;
+    }
+  };
+
+  const fetchActiveRooms = async () => {
+    setFetchingRooms(true);
+    try {
+      const { data, error: fetchErr } = await supabase
+        .from('rooms')
+        .select('id, code, status, created_at, players(id), messages(created_at)')
+        .neq('status', 'finished');
+
+      if (fetchErr) throw fetchErr;
+      
+      const processedRooms = (data || []).map((roomItem) => {
+        const lastMessage = roomItem.messages && roomItem.messages.length > 0
+          ? roomItem.messages.reduce((latest, current) => 
+              new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+            )
+          : null;
+
+        const lastActivityTime = lastMessage 
+          ? new Date(lastMessage.created_at) 
+          : new Date(roomItem.created_at);
+
+        return {
+          ...roomItem,
+          lastActivityTime
+        };
+      });
+
+      // Sort chronologically (most recent first)
+      processedRooms.sort((a, b) => b.lastActivityTime - a.lastActivityTime);
+
+      setActiveRooms(processedRooms);
+    } catch (err) {
+      console.error('Error fetching active rooms:', err);
+    } finally {
+      setFetchingRooms(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveRooms();
+  }, []);
 
   const inputRefs = [
     useRef(null),
@@ -182,6 +256,58 @@ export default function Home() {
           </form>
         </section>
       </main>
+
+      {/* Active Games Section */}
+      <section className="active-rooms-section">
+        <div className="active-rooms-header">
+          <h2 className="active-rooms-title">⚔️ Partidas Activas</h2>
+          <button 
+            type="button"
+            onClick={fetchActiveRooms} 
+            className="refresh-btn" 
+            disabled={fetchingRooms}
+          >
+            {fetchingRooms ? 'Buscando...' : 'Actualizar'}
+          </button>
+        </div>
+        {fetchingRooms && activeRooms.length === 0 ? (
+          <p style={{ color: 'var(--secondary)', textAlign: 'center', margin: '2rem 0' }}>
+            Buscando tableros de juego activos en el reino...
+          </p>
+        ) : activeRooms.length === 0 ? (
+          <div className="empty-rooms-card">
+            <p>No hay salas activas en este momento. ¡Forja la tuya para iniciar la leyenda!</p>
+          </div>
+        ) : (
+          <div className="rooms-grid">
+            {activeRooms.map((roomItem) => (
+              <div key={roomItem.id} className="room-card">
+                <div className="room-card-info">
+                  <span className="room-card-code">{roomItem.code}</span>
+                  <div className="room-card-details">
+                    <span className={roomItem.status === 'lobby' ? 'room-status-lobby' : 'room-status-playing'}>
+                      ● {roomItem.status === 'lobby' ? 'Esperando Héroes' : 'En Campaña'}
+                    </span>
+                    <span className="room-card-players">
+                      👤 {roomItem.players?.length || 0} {roomItem.players?.length === 1 ? 'jugador' : 'jugadores'}
+                    </span>
+                    <span className="room-card-activity" style={{ marginTop: '0.2rem', opacity: 0.8, fontSize: '0.8rem', color: 'var(--secondary)' }}>
+                      ⏳ Última jugada: {formatLastActivity(roomItem.lastActivityTime)}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/room/${roomItem.code}/character`)}
+                  className="btn enter-btn"
+                >
+                  Entrar
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <footer style={styles.footer}>
         <p>Asegúrate de configurar tus credenciales en el archivo <code>.env.local</code> y aplicar la migración <code>schema.sql</code> antes de jugar.</p>

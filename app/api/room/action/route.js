@@ -8,15 +8,23 @@ const responseSchema = {
   properties: {
     gm_message: {
       type: SchemaType.STRING,
-      description: "La respuesta narrativa del Game Master en español, describiendo el resultado de la acción basándose en la tirada."
+      description: "La respuesta narrativa del Game Master en español, describiendo el resultado de la acción basándose en la tirada (si es que se usó la tirada)."
     },
     next_player_id: {
       type: SchemaType.STRING,
-      description: "El ID del siguiente jugador en la secuencia de juego."
+      description: "El ID del siguiente jugador en la secuencia de juego. Puede ser un string vacío '' si next_turn_mode es 'free'."
     },
     next_dice_type: {
       type: SchemaType.STRING,
       description: "El tipo de dado recomendado para el siguiente turno (ej: 'D20', 'D12', 'D10', 'D6', 'D4')."
+    },
+    dice_roll_used: {
+      type: SchemaType.BOOLEAN,
+      description: "Indica si la acción del jugador requería un tiro de dado para evaluar su éxito o fracaso. Debe ser false para acciones cotidianas o conversaciones simples (ej: hablar con un compañero, caminar a un cuarto vacío, sentarse), y true para desafíos de destreza, ataques, uso de magia compleja, sigilo frente a enemigos, etc."
+    },
+    next_turn_mode: {
+      type: SchemaType.STRING,
+      description: "El modo de juego para el siguiente turno. Debe ser 'free' (para exploración libre donde cualquiera puede hablar y actuar en cualquier orden) o 'ordered' (para turnos secuenciales estrictos cuando hay combate activo, trampas de tiempo real o situaciones tensas de uno a la vez)."
     },
     updated_players: {
       type: SchemaType.ARRAY,
@@ -48,7 +56,7 @@ const responseSchema = {
     },
     updated_gm_context: {
       type: SchemaType.STRING,
-      description: "El resumen de memoria actualizado y condensado de la campaña (Quest status, eventos clave, etc)."
+      description: "La bitácora o crónica acumulativa de toda la campaña. Debe resumir cronológicamente todos los sucesos notables, decisiones, combates, objetos hallados y descubrimientos clave desde el inicio de la campaña hasta el presente. No borres la historia antigua; anexa los nuevos hitos para mantener una memoria permanente de todo el viaje."
     },
     game_status: {
       type: SchemaType.STRING,
@@ -63,6 +71,8 @@ const responseSchema = {
     "gm_message",
     "next_player_id",
     "next_dice_type",
+    "dice_roll_used",
+    "next_turn_mode",
     "updated_players",
     "is_critical_moment",
     "image_prompt",
@@ -109,40 +119,17 @@ export async function POST(request) {
     const player = playerRes.data;
     const allPlayers = allPlayersRes.data;
 
-    // Backend turn enforcer guard
-    if (room.active_player_id !== playerId) {
+    // Backend turn enforcer guard (only when in ordered mode!)
+    if (room.turn_mode === 'ordered' && room.active_player_id !== playerId) {
       return NextResponse.json({ error: 'No es tu turno de juego.' }, { status: 403 });
     }
 
-    // 2. Compute Dice Roll
+    // 2. Compute Pre-generated Dice Roll
     const diceType = room.current_dice_type || 'D20';
     const maxRoll = parseInt(diceType.replace('D', ''), 10) || 20;
     const roll = Math.floor(Math.random() * maxRoll) + 1;
 
-    // 3. Write player action to message logs
-    const { error: msgErr1 } = await supabase.from('messages').insert([
-      {
-        room_id: roomUuid,
-        sender_type: 'player',
-        player_id: playerId,
-        message_type: 'action',
-        content: actionText,
-        dice_roll: roll
-      }
-    ]);
-    if (msgErr1) throw msgErr1;
-
-    // 4. Write system log announcement for the roll
-    const { error: msgErr2 } = await supabase.from('messages').insert([
-      {
-        room_id: roomUuid,
-        sender_type: 'system',
-        content: `🎲 ${player.name} lanza un ${diceType} sacando un ${roll} para realizar su acción.`
-      }
-    ]);
-    if (msgErr2) throw msgErr2;
-
-    // 5. Fetch last 15 messages for conversational history
+    // 3. Fetch last 15 messages for conversational history
     const { data: recentMsgs, error: fetchMsgsErr } = await supabase
       .from('messages')
       .select('*')
@@ -181,6 +168,10 @@ DESCRIPCIÓN GLOBAL DE LA CAMPAÑA (TRASFONDO):
 ${room.description || 'No se ha provisto un trasfondo específico. Mazmorra medieval estándar.'}
 (Nota para el GM: Esta descripción global sirve de guía general para la trama, pero eres libre de introducir giros argumentales, sorpresas o adiciones secretas).
 
+MODO DE TURNOS ACTUAL:
+${room.turn_mode || 'free'}
+(Nota para el GM: Si el modo actual es 'free', los aventureros juegan de manera libre sin orden estricto de turnos. Si el modo es 'ordered', juegan estrictamente en turnos ordenados. Evalúa si la nueva acción merece iniciar un combate o secuencia de peligro para cambiar a 'ordered', o si la situación se ha calmado para volver a 'free').
+
 HISTORIAL DE MEMORIA DEL NARRADOR (GM CONTEXT):
 ${room.gm_context || 'Inicio del viaje a las puertas de la mazmorra ancestral.'}
 
@@ -193,30 +184,22 @@ ${recentMessagesText}
 NUEVA ACCIÓN A EVALUAR:
 Jugador Activo: "${player.name}" (Clase: ${player.class}, Raza: ${player.race})
 Acción declarada: "${actionText}"
-Resultado del tiro de dado (${diceType}): sacó un ${roll} de un máximo de ${maxRoll}.
+Resultado del tiro de dado en caso de ser necesario (${diceType}): sacó un ${roll} de un máximo de ${maxRoll}.
 
 INSTRUCCIONES PARA TU RESPUESTA:
-1. Actúa como el Game Master (GM) y narra el desenlace de la acción en "gm_message".
-   - Sé inmersivo, usa una prosa de fantasía de alta calidad en español.
-   - Evalúa el éxito o fracaso basándote directamente en el tiro de dados (20 es éxito legendario, 1 es catástrofe rotunda, < 10 es fallo o complicación severa, >= 10 es un éxito moderado o completo).
-2. Modificaciones de HP/XP:
-   - Si la acción falló o era peligrosa, resta HP de manera justa al jugador en "updated_players" (ej: -10 HP o -15 HP).
-   - Si el jugador hizo una gran hazaña o avanzó, otorga XP (ej: +20 XP).
-   - Si un jugador alcanza 100 XP o múltiplos, aumenta su Level en 1 y reinicia el XP restante.
-   - Deberás devolver las estadísticas completas de los jugadores modificados.
-3. Rotación de Turno:
-   - Determina a quién le toca ir ahora. Asigna su ID exacto a "next_player_id".
-   - Para mantener el orden, rota secuencialmente según el 'Orden de unión' (join_order). El jugador actual tiene join_order = ${player.join_order}. El siguiente debe ser el que tenga join_order = ${(player.join_order + 1) % allPlayers.length}.
-   - IDs válidos de aventureros disponibles: ${allPlayers.map((p) => `"${p.id}" (${p.name})`).join(', ')}.
-4. Próxima Tirada:
-   - Establece el tipo de dado para la siguiente acción del próximo jugador en "next_dice_type" (ej: "D20" por defecto, o dados menores como "D10", "D8", "D6" si están en una situación apremiante o combate cerrado).
+1. Actúa como el Game Master (GM). Evalúa si la acción declarada por el jugador requiere una tirada de dados para resolverse (ej: atacar, forzar cerraduras, esquivar trampas o escalar rocas requieren tirada de dados; mientras que hablar con otros, mirar a su alrededor, caminar por pasillos vacíos o esperar de pie NO requieren tiradas de dados).
+   - Establece "dice_roll_used" en true si la tirada de dado es requerida para este desenlace. En este caso, evalúa el tiro provisto (${roll} de ${maxRoll}) para narrar el resultado en "gm_message".
+   - Establece "dice_roll_used" en false si no se requiere tirada de dados. Narra el desenlace directamente sin penalizar/beneficiar según el número del dado.
+2. Determina el modo de turnos para el siguiente ciclo de juego en "next_turn_mode" ('free' o 'ordered'). Si se inicia un combate o un evento de riesgo inmediato que requiera turnos estrictos, cámbialo a 'ordered'. Si la situación está en calma o la lucha terminó, déjalo o regrésalo a 'free'.
+3. Rotación de Turno ("next_player_id"):
+   - Si "next_turn_mode" es "ordered", selecciona el ID del jugador al que le toca actuar en la rotación según join_order.
+   - Si "next_turn_mode" es "free", establece "next_player_id" como un string vacío "".
+4. Modificaciones de HP/XP:
+   - Modifica las estadísticas en "updated_players" cuando sea necesario. Si falló gravemente en una acción peligrosa, resta HP de manera justa. Otorga XP por progresos y buenas ideas.
 5. Ilustración Escénica:
-   - Si ocurre algo épico, cómico o un giro dramático, pon "is_critical_moment" en true y genera un prompt descriptivo en inglés para Midjourney/DallE en "image_prompt".
-6. Estado de la Campaña:
-   - Evalúa si la campaña ha terminado. Establece "game_status" en "finished" si todos los aventureros han muerto (HP = 0) o si han completado con éxito su misión (victoria). De lo contrario, debe ser "playing".
-   - Si declaras "finished", describe la victoria o derrota final brevemente en "campaign_outcome" (ej: "Los aventureros perecieron ante el fuego del dragón" o "Los héroes recuperaron la gema y salvaron el reino"). De lo contrario, pon un string vacío.
-7. Contexto de Memoria:
-   - Modifica el "updated_gm_context" resumiendo el estado actual de la campaña y hechos críticos para recordar en turnos posteriores.
+   - Si ocurre algo memorable, genera un prompt descriptivo en inglés en "image_prompt" y activa "is_critical_moment".
+6. Contexto de Memoria:
+   - Modifica y extiende la bitácora "updated_gm_context" en tu respuesta. Este campo es tu diario persistente de la campaña y recopila la historia entera. No olvides los sucesos de turnos anteriores; al contrario, resume brevemente la resolución de la acción de este turno y agrégala al final de la bitácora acumulada, preservando todos los hechos memorables e importantes que han ocurrido en la campaña para asegurar la coherencia del mundo en futuros turnos.
 `;
 
     // Initialize Gemini Client
@@ -255,7 +238,49 @@ INSTRUCCIONES PARA TU RESPUESTA:
       finalImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${seed}`;
     }
 
-    // B. Insert GM Narrative Message
+    // B. Insert Player Action message into message logs
+    const { error: msgErr1 } = await supabase.from('messages').insert([
+      {
+        room_id: roomUuid,
+        sender_type: 'player',
+        player_id: playerId,
+        message_type: 'action',
+        content: actionText,
+        dice_roll: gmResponse.dice_roll_used ? roll : null
+      }
+    ]);
+    if (msgErr1) throw msgErr1;
+
+    // C. If dice roll was used, insert system log of the roll
+    if (gmResponse.dice_roll_used) {
+      const { error: msgErr2 } = await supabase.from('messages').insert([
+        {
+          room_id: roomUuid,
+          sender_type: 'system',
+          content: `🎲 ${player.name} lanza un ${diceType} sacando un ${roll} para realizar su acción.`
+        }
+      ]);
+      if (msgErr2) throw msgErr2;
+    }
+
+    // D. If the turn mode changed, insert system log indicating mode shift
+    if (gmResponse.next_turn_mode !== room.turn_mode) {
+      let modeText = '';
+      if (gmResponse.next_turn_mode === 'ordered') {
+        modeText = `⚔️ Modo de combate iniciado. Turnos ordenados activos.`;
+      } else {
+        modeText = `🕊️ Modo de exploración libre iniciado. Todos los aventureros pueden actuar libremente.`;
+      }
+      await supabase.from('messages').insert([
+        {
+          room_id: roomUuid,
+          sender_type: 'system',
+          content: modeText
+        }
+      ]);
+    }
+
+    // E. Insert GM Narrative Message
     const { error: gmMsgErr } = await supabase.from('messages').insert([
       {
         room_id: roomUuid,
@@ -266,7 +291,7 @@ INSTRUCCIONES PARA TU RESPUESTA:
     ]);
     if (gmMsgErr) throw gmMsgErr;
 
-    // C. Apply Player Stat Changes
+    // F. Apply Player Stat Changes
     if (gmResponse.updated_players && gmResponse.updated_players.length > 0) {
       for (const up of gmResponse.updated_players) {
         // Fetch current player to merge default stats if missing
@@ -287,23 +312,30 @@ INSTRUCCIONES PARA TU RESPUESTA:
       }
     }
 
-    // D. Update Room State (turn, context, dice type, status)
-    // Validate next_player_id is in room
-    let finalNextPlayerId = gmResponse.next_player_id;
-    const isValidId = allPlayers.some((p) => p.id === finalNextPlayerId);
-    if (!isValidId) {
-      // Fallback to sequential join order
-      const currentIdx = allPlayers.findIndex((p) => p.id === playerId);
-      const fallbackPlayer = allPlayers[(currentIdx + 1) % allPlayers.length];
-      finalNextPlayerId = fallbackPlayer.id;
-    }
-
+    // G. Update Room State (turn, turn_mode, context, dice type, status)
     const isFinished = gmResponse.game_status === 'finished';
     const roomUpdates = {
       gm_context: gmResponse.updated_gm_context || room.gm_context,
-      active_player_id: finalNextPlayerId,
-      current_dice_type: gmResponse.next_dice_type || 'D20'
+      current_dice_type: gmResponse.next_dice_type || 'D20',
+      turn_mode: gmResponse.next_turn_mode || 'free'
     };
+
+    if (roomUpdates.turn_mode === 'ordered') {
+      // Validate next_player_id is in room
+      let finalNextPlayerId = gmResponse.next_player_id;
+      const isValidId = allPlayers.some((p) => p.id === finalNextPlayerId);
+      if (!isValidId) {
+        // Fallback to sequential join order
+        const currentIdx = allPlayers.findIndex((p) => p.id === playerId);
+        const fallbackPlayer = allPlayers[(currentIdx + 1) % allPlayers.length];
+        roomUpdates.active_player_id = fallbackPlayer.id;
+      } else {
+        roomUpdates.active_player_id = finalNextPlayerId;
+      }
+    } else {
+      // Free play mode: active player is null
+      roomUpdates.active_player_id = null;
+    }
 
     if (isFinished) {
       roomUpdates.status = 'finished';

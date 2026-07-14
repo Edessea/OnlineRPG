@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS rooms (
   defeat_condition TEXT,
   creator_id UUID REFERENCES users(id) ON DELETE SET NULL,
   description TEXT,
-  name VARCHAR(255)
+  name VARCHAR(255),
+  turn_mode VARCHAR(50) DEFAULT 'free' NOT NULL
 );
 
 -- 4. Create players table

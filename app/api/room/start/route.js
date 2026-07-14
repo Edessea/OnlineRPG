@@ -11,7 +11,7 @@ const responseSchema = {
     },
     initial_context: {
       type: SchemaType.STRING,
-      description: "El resumen inicial de memoria y quest status de la campaña para la memoria futura del GM."
+      description: "La bitácora o crónica inicial de la campaña (Quest status inicial, llegada a las puertas y estado del grupo). Servirá de base acumulativa para registrar toda la historia de la campaña."
     }
   },
   required: ["welcome_message", "initial_context"]
@@ -86,7 +86,7 @@ REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
 2. Termina llamando al grupo a la acción y cediendo la palabra a los jugadores.
 3. Devuelve un JSON que contenga:
    - "welcome_message": La narración literaria detallada.
-   - "initial_context": Un resumen del estado inicial del quest, los jugadores presentes y su relación de extraños.
+   - "initial_context": El registro inicial de la bitácora de la campaña, estableciendo las bases del quest, el grupo reunido en modo libre y el trasfondo inicial de la campaña para las futuras anexiones de memoria.
 `;
 
     // 4. Invoke Gemini API
@@ -121,7 +121,8 @@ REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
       .from('rooms')
       .update({
         status: 'playing',
-        active_player_id: firstPlayer.id,
+        turn_mode: 'free',
+        active_player_id: null,
         gm_context: gmResponse.initial_context
       })
       .eq('id', roomUuid);
@@ -133,7 +134,7 @@ REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
       {
         room_id: roomUuid,
         sender_type: 'system',
-        content: `⚔️ ¡La campaña ha comenzado! El destino de la campaña está en juego. Es el turno de ${firstPlayer.name}.`
+        content: `⚔️ ¡La campaña ha comenzado! La exploración está abierta para todos los aventureros en modo libre.`
       }
     ]);
 

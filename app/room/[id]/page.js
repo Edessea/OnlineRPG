@@ -18,7 +18,6 @@ export default function GameRoom() {
   // Inputs State
   const [messageType, setMessageType] = useState('chat'); // 'chat' (OOC) or 'action'
   const [inputText, setInputText] = useState('');
-  const [actionLockedText, setActionLockedText] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Campaign Description modal state
@@ -144,18 +143,13 @@ export default function GameRoom() {
     }
   };
 
-  // Prepare and lock action text
-  const handleLockAction = (e) => {
+  // Submit action directly to backend GM
+  const handleDirectActionSubmit = async (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-    setActionLockedText(inputText.trim());
-    setInputText('');
-  };
-
-  // Roll dice and submit action
-  const handleRollAndSubmitAction = async () => {
-    if (!actionLockedText) return;
     setSubmitting(true);
+    const actionTextToSend = inputText.trim();
+    setInputText('');
 
     try {
       // Call consolidated backend API action route
@@ -165,14 +159,12 @@ export default function GameRoom() {
         body: JSON.stringify({
           roomId,
           playerId: currentPlayer.id,
-          actionText: actionLockedText
+          actionText: actionTextToSend
         })
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo procesar la acción.');
-
-      setActionLockedText(null);
     } catch (err) {
       console.error('Error al realizar la acción:', err);
       alert(err.message || 'Error al procesar tu acción. Inténtalo de nuevo.');
@@ -193,6 +185,20 @@ export default function GameRoom() {
           <span style={room.status === 'lobby' ? styles.statusLobby : styles.statusPlaying}>
             ● {room.status === 'lobby' ? 'Lobby Abierto' : 'Campaña Iniciada'}
           </span>
+          {room.status === 'playing' && (
+            <span style={{
+              background: room.turn_mode === 'ordered' ? '#ef4444' : '#10b981',
+              color: '#ffffff',
+              fontSize: '0.75rem',
+              padding: '0.15rem 0.5rem',
+              borderRadius: '4px',
+              fontWeight: '600',
+              marginLeft: '0.5rem',
+              textTransform: 'uppercase'
+            }}>
+              {room.turn_mode === 'ordered' ? '⚔️ Turnos Ordenados' : '🕊️ Exploración Libre'}
+            </span>
+          )}
           <span style={styles.playerCount}>{players.length} Aventureros</span>
           <button
             type="button"
@@ -427,7 +433,6 @@ export default function GameRoom() {
                     }}
                     onClick={() => {
                       setMessageType('chat');
-                      setActionLockedText(null);
                     }}
                   >
                     Mandar Chat OOC
@@ -439,7 +444,7 @@ export default function GameRoom() {
                     }}
                     onClick={() => setMessageType('action')}
                   >
-                    Realizar Acción de Turno
+                    Realizar Acción
                   </button>
                 </div>
 
@@ -464,32 +469,14 @@ export default function GameRoom() {
                 {/* If In-Game Action Turn is Active */}
                 {messageType === 'action' && (
                   <div style={styles.actionConsole}>
-                    {room.active_player_id !== currentPlayer.id ? (
+                    {room.turn_mode === 'ordered' && room.active_player_id !== currentPlayer.id ? (
                       // Waiting for Turn
                       <div style={styles.turnNotification}>
                         <span>⌛ Espera tu turno. Actualmente es el turno de <strong>{activePlayer ? activePlayer.name : 'otro jugador'}</strong>.</span>
                       </div>
-                    ) : actionLockedText ? (
-                      // Action typed, prompt Dice Roll
-                      <div style={styles.diceConsole}>
-                        <div style={styles.lockedActionPreview}>
-                          <strong>Acción preparada:</strong> &ldquo;{actionLockedText}&rdquo;
-                        </div>
-                        <p style={styles.diceText}>Se requiere un tiro de dados para evaluar tu éxito.</p>
-                        <button 
-                          className="btn" 
-                          onClick={handleRollAndSubmitAction}
-                          style={styles.rollBtn}
-                          disabled={submitting}
-                        >
-                          {submitting 
-                            ? 'Consultando al GM...' 
-                            : `🎲 Lanzar ${room.current_dice_type || 'D20'} y Finalizar Turno`}
-                        </button>
-                      </div>
                     ) : (
-                      // Type Turn Action
-                      <form onSubmit={handleLockAction} style={styles.actionForm}>
+                      // Direct Action Form
+                      <form onSubmit={handleDirectActionSubmit} style={styles.actionForm}>
                         <textarea
                           placeholder="Describe tu acción física o conjuro (ej: Desenvaino mi espada e intento golpear al orco...)"
                           value={inputText}
@@ -499,7 +486,11 @@ export default function GameRoom() {
                           required
                         />
                         <button type="submit" className="btn" style={styles.actionSubmitBtn} disabled={submitting}>
-                          Preparar Acción de Turno
+                          {submitting 
+                            ? 'Enviando al GM...' 
+                            : room.turn_mode === 'ordered' 
+                              ? `Enviar Acción (Turno de ${currentPlayer.name})` 
+                              : 'Enviar Acción'}
                         </button>
                       </form>
                     )}

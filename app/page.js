@@ -13,6 +13,15 @@ const ALL_SKILLS = [
   "Criptografía", "Historia Antigua", "Cocina Rápida", "Contabilidad", "Oratoria Pública"
 ];
 
+const SPELL_LIBRARY = [
+  { name: 'Proyectil Mágico', tier: 1, type: 'Daño', desc: 'Lanza tres dardos de fuerza pura que golpean infaliblemente a tus enemigos.' },
+  { name: 'Curar Heridas Leves', tier: 1, type: 'Curación', desc: 'Restaura una pequeña cantidad de HP a ti o a un aliado cercano.' },
+  { name: 'Escudo de Fuerza', tier: 1, type: 'Defensa', desc: 'Crea una barrera mágica invisible que te protege de los ataques de este turno.' },
+  { name: 'Luz Divina', tier: 1, type: 'Utilidad', desc: 'Ilumina una habitación oscura o ciega temporalmente a un enemigo.' }
+];
+
+const STARTING_SPELLS = SPELL_LIBRARY.map(s => s.name);
+
 export default function Home() {
   const router = useRouter();
   
@@ -42,6 +51,7 @@ export default function Home() {
   const [rolledDice, setRolledDice] = useState([]);
   const [isRolling, setIsRolling] = useState(false);
   const [rolledSkills, setRolledSkills] = useState([]);
+  const [rolledSpells, setRolledSpells] = useState([]);
   const [hasRolled, setHasRolled] = useState(false);
   const [assignedStats, setAssignedStats] = useState({
     fuerza: null,
@@ -432,6 +442,7 @@ export default function Home() {
     setNewCharClass('Guerrero');
     setRolledDice([]);
     setRolledSkills([]);
+    setRolledSpells([]);
     handleResetDistribution();
     setHasRolled(false);
     setNewCharError(null);
@@ -443,6 +454,7 @@ export default function Home() {
     setNewCharError(null);
     setRolledDice([]);
     setRolledSkills([]);
+    setRolledSpells([]);
     handleResetDistribution();
     setHasRolled(false);
   };
@@ -453,10 +465,13 @@ export default function Home() {
     const diceResults = Array.from({ length: 6 }, () => Math.floor(Math.random() * 20) + 1);
     const shuffledSkills = [...ALL_SKILLS].sort(() => 0.5 - Math.random());
     const selectedSkills = shuffledSkills.slice(0, 3);
+    const shuffledSpells = [...STARTING_SPELLS].sort(() => 0.5 - Math.random());
+    const selectedSpells = shuffledSpells.slice(0, 2);
     
     setTimeout(() => {
       setRolledDice(diceResults);
       setRolledSkills(selectedSkills);
+      setRolledSpells(selectedSpells);
       handleResetDistribution();
       setIsRolling(false);
       setHasRolled(true);
@@ -490,7 +505,8 @@ export default function Home() {
           salud: assignedStats.salud,
           carisma: assignedStats.carisma,
           inteligencia: assignedStats.inteligencia,
-          skills: rolledSkills
+          skills: rolledSkills,
+          spells: rolledSpells
         }])
         .select()
         .single();
@@ -503,6 +519,7 @@ export default function Home() {
       setNewCharDesc('');
       setRolledDice([]);
       setRolledSkills([]);
+      setRolledSpells([]);
       handleResetDistribution();
       setHasRolled(false);
     } catch (err) {
@@ -682,6 +699,16 @@ export default function Home() {
                     <span className="char-meta">{char.race} • {char.class}</span>
                     {char.description && (
                       <span className="char-desc" title={char.description}>{char.description}</span>
+                    )}
+                    {char.skills && char.skills.length > 0 && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--secondary)', marginTop: '0.35rem' }}>
+                        🎯 <strong>Habilidades:</strong> {char.skills.join(', ')}
+                      </div>
+                    )}
+                    {char.spells && char.spells.length > 0 && (
+                      <div style={{ fontSize: '0.8rem', color: '#818cf8', marginTop: '0.2rem' }}>
+                        🪄 <strong>Conjuros:</strong> {char.spells.join(', ')}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1061,7 +1088,7 @@ export default function Home() {
 
                     {/* Rolled Skills Display */}
                     {rolledSkills.length > 0 && (
-                      <div style={{ backgroundColor: 'rgba(99, 102, 241, 0.08)', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem', marginBottom: '1.5rem' }}>
+                      <div style={{ backgroundColor: 'rgba(99, 102, 241, 0.08)', border: '1px solid var(--border)', borderRadius: '6px', padding: '1rem', marginBottom: '1rem' }}>
                         <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', color: 'var(--accent)' }}>✨ Habilidades Obtenidas (3 de 30 aleatorias):</h4>
                         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
                           {rolledSkills.map((sk, index) => (
@@ -1081,6 +1108,41 @@ export default function Home() {
                               {sk}
                             </span>
                           ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rolled Spells Display */}
+                    {rolledSpells.length > 0 && (
+                      <div style={{ backgroundColor: 'rgba(129, 140, 248, 0.08)', border: '1px solid #4338ca', borderRadius: '6px', padding: '1rem', marginBottom: '1.5rem' }}>
+                        <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', color: '#818cf8', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          🪄 Conjuros Iniciales Obtenidos:
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {rolledSpells.map((spName) => {
+                            const spellInfo = SPELL_LIBRARY.find(s => s.name === spName) || { name: spName, type: 'Conjuro', desc: 'Un conjuro de iniciación mágica.' };
+                            return (
+                              <div
+                                key={spName}
+                                style={{
+                                  backgroundColor: '#0f172a',
+                                  border: '1px solid #334155',
+                                  borderRadius: '6px',
+                                  padding: '0.6rem 0.8rem'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                                  <span style={{ fontWeight: 'bold', color: '#a5b4fc', fontSize: '0.88rem' }}>🪄 {spellInfo.name}</span>
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--secondary)', backgroundColor: '#1e293b', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>
+                                    {spellInfo.type}
+                                  </span>
+                                </div>
+                                <p style={{ margin: 0, fontSize: '0.8rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+                                  {spellInfo.desc}
+                                </p>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}

@@ -151,8 +151,12 @@ REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
     return NextResponse.json({ success: true, message: 'La campaña ha comenzado exitosamente.' });
   } catch (err) {
     console.error('Error al iniciar campaña:', err);
+    let errMsg = err.message || 'Error interno al inicializar la campaña.';
+    if (errMsg.includes('turn_mode') || errMsg.includes('schema cache')) {
+      errMsg = 'La columna "turn_mode" no existe en la tabla "rooms". Por favor, ejecuta las sentencias SQL de migration_v5.sql en tu consola de Supabase (SQL Editor).';
+    }
     return NextResponse.json(
-      { error: err.message || 'Error interno al inicializar la campaña.' },
+      { error: errMsg },
       { status: 500 }
     );
   }

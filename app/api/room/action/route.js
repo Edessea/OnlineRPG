@@ -380,8 +380,12 @@ INSTRUCCIONES PARA TU RESPUESTA:
     return NextResponse.json({ success: true, message: 'Turno procesado correctamente por el GM.' });
   } catch (err) {
     console.error('Error en Action Handler Endpoint:', err);
+    let errMsg = err.message || 'Error interno del servidor al procesar el turno.';
+    if (errMsg.includes('turn_mode') || errMsg.includes('schema cache')) {
+      errMsg = 'La columna "turn_mode" no existe en la tabla "rooms". Por favor, ejecuta las sentencias SQL de migration_v5.sql en tu consola de Supabase (SQL Editor).';
+    }
     return NextResponse.json(
-      { error: err.message || 'Error interno del servidor al procesar el turno.' },
+      { error: errMsg },
       { status: 500 }
     );
   }

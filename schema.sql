@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS characters (
   salud INTEGER,
   carisma INTEGER,
   inteligencia INTEGER,
-  skills JSONB
+  skills JSONB,
+  spells JSONB DEFAULT '[]'::jsonb
 );
 
 -- 3. Create rooms table

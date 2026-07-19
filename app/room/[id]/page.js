@@ -555,17 +555,15 @@ export default function GameRoom() {
                   >
                     Realizar Acción
                   </button>
-                  {hasMagic && (
-                    <button 
-                      style={{
-                        ...styles.toggleTab,
-                        ...(messageType === 'spells' ? styles.toggleTabActive : {})
-                      }}
-                      onClick={() => setMessageType('spells')}
-                    >
-                      🪄 Libro de Hechizos
-                    </button>
-                  )}
+                  <button 
+                    style={{
+                      ...styles.toggleTab,
+                      ...(messageType === 'spells' ? styles.toggleTabActive : {})
+                    }}
+                    onClick={() => setMessageType('spells')}
+                  >
+                    🪄 Libro de Hechizos
+                  </button>
                 </div>
 
                 {/* If Out-Of-Character Chat is Active */}

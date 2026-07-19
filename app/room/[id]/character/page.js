@@ -200,8 +200,12 @@ export default function CharacterCreation() {
           name: characterToJoin.name,
           race: characterToJoin.race,
           class: characterToJoin.class,
-          description: characterToJoin.description || 'Un valeroso aventurero.',
-          stats: { HP: characterToJoin.salud || 100, Level: 1, XP: 0 },
+          stats: { 
+            HP: characterToJoin.salud || 100, 
+            Level: 1, 
+            XP: 0,
+            spells: characterToJoin.spells || [] 
+          },
           fuerza: characterToJoin.fuerza || 10,
           destreza: characterToJoin.destreza || 10,
           magia: characterToJoin.magia || 10,
@@ -305,6 +309,11 @@ export default function CharacterCreation() {
                       </div>
                       <span style={{ fontWeight: 'bold', display: 'block' }}>{char.name}</span>
                       <span style={{ fontSize: '0.8rem', color: 'var(--secondary)' }}>{char.race} • {char.class}</span>
+                      {char.spells && char.spells.length > 0 && (
+                        <span style={{ display: 'block', fontSize: '0.75rem', color: '#818cf8', marginTop: '0.3rem' }}>
+                          🪄 {char.spells.join(', ')}
+                        </span>
+                      )}
                       {isBusy && (
                         <span style={{ 
                           display: 'block', 

@@ -18,6 +18,7 @@ export default function CharacterCreation() {
   // Available user characters
   const [userCharacters, setUserCharacters] = useState([]);
   const [selectedCharId, setSelectedCharId] = useState(null);
+  const [characterCampaigns, setCharacterCampaigns] = useState({});
 
   const getRoomUuid = async (code) => {
     const isUuid = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/.test(code);
@@ -43,12 +44,29 @@ export default function CharacterCreation() {
       try {
         const storedUser = localStorage.getItem('rpg_user');
         if (!storedUser) {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('redirect_room', roomId);
+          }
           // If not logged in, redirect to home page
           router.push('/');
           return;
         }
 
         const parsedUser = JSON.parse(storedUser);
+        
+        // Check if user still exists in DB
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', parsedUser.id)
+          .maybeSingle();
+
+        if (!dbUser) {
+          localStorage.removeItem('rpg_user');
+          router.push('/');
+          return;
+        }
+
         setUser(parsedUser);
 
         const roomUuid = await getRoomUuid(roomId);
@@ -77,11 +95,42 @@ export default function CharacterCreation() {
           .order('created_at', { ascending: false });
 
         if (charsErr) throw charsErr;
+
+        // 3. Fetch user's active players to check busy status
+        const { data: userPlayers, error: playersErr } = await supabase
+          .from('players')
+          .select(`
+            character_id,
+            room_id,
+            rooms (
+              name,
+              status
+            )
+          `)
+          .eq('user_id', parsedUser.id);
+
+        if (playersErr) throw playersErr;
+
+        const busyMap = {};
+        if (userPlayers) {
+          for (const p of userPlayers) {
+            if (p.rooms && p.rooms.status !== 'finished') {
+              busyMap[p.character_id] = p.rooms.name || 'Campaña sin nombre';
+            }
+          }
+        }
+
+        setCharacterCampaigns(busyMap);
         setUserCharacters(chars || []);
 
         if (chars && chars.length > 0) {
-          // Default to first character
-          setSelectedCharId(chars[0].id);
+          // Default to first character that is NOT busy
+          const firstAvailable = chars.find(c => !busyMap[c.id]);
+          if (firstAvailable) {
+            setSelectedCharId(firstAvailable.id);
+          } else {
+            setSelectedCharId(null);
+          }
         }
 
         setLoadingSession(false);
@@ -106,6 +155,26 @@ export default function CharacterCreation() {
 
     try {
       if (!user) throw new Error('No hay una sesión activa.');
+
+      // Double check active campaign constraint
+      const { data: checkChar, error: checkCharErr } = await supabase
+        .from('players')
+        .select(`
+          room_id,
+          rooms (
+            name,
+            status
+          )
+        `)
+        .eq('character_id', selectedCharId);
+
+      if (checkCharErr) throw checkCharErr;
+      
+      const activeCampaign = checkChar?.find(p => p.rooms && p.rooms.status !== 'finished');
+      if (activeCampaign) {
+        throw new Error(`Este personaje ya está participando en la campaña activa "${activeCampaign.rooms.name || 'Campaña sin nombre'}".`);
+      }
+
       const roomUuid = await getRoomUuid(roomId);
 
       // Fetch player count for join_order
@@ -148,6 +217,9 @@ export default function CharacterCreation() {
         if (insertError.code === '23505') {
           router.push(`/room/${roomId}`);
           return;
+        }
+        if (insertError.message && insertError.message.includes('Character is already in an active campaign')) {
+          throw new Error('Este personaje ya está participando en otra campaña activa y no puede estar en dos a la vez.');
         }
         throw insertError;
       }
@@ -207,19 +279,46 @@ export default function CharacterCreation() {
             <div>
               <label style={styles.label}>Selecciona tu personaje para esta campaña</label>
               <div className="char-selection-grid">
-                {userCharacters.map((char) => (
-                  <div
-                    key={char.id}
-                    className={`selection-char-card ${selectedCharId === char.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedCharId(char.id)}
-                  >
-                    <div style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>
-                      {char.class === 'Mago' ? '🧙' : char.class === 'Guerrero' ? '⚔️' : char.class === 'Pícaro' ? '🗡️' : '🛡️'}
+                {userCharacters.map((char) => {
+                  const isBusy = !!characterCampaigns[char.id];
+                  return (
+                    <div
+                      key={char.id}
+                      className={`selection-char-card ${selectedCharId === char.id ? 'selected' : ''}`}
+                      onClick={() => {
+                        if (isBusy) {
+                          setError(`El personaje "${char.name}" ya está en la campaña activa "${characterCampaigns[char.id]}".`);
+                          return;
+                        }
+                        setSelectedCharId(char.id);
+                        setError(null);
+                      }}
+                      style={{
+                        opacity: isBusy ? 0.52 : 1,
+                        cursor: isBusy ? 'not-allowed' : 'pointer',
+                        borderColor: isBusy ? 'rgba(239, 68, 68, 0.4)' : undefined,
+                        boxShadow: isBusy ? 'none' : undefined,
+                      }}
+                    >
+                      <div style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>
+                        {char.class === 'Mago' ? '🧙' : char.class === 'Guerrero' ? '⚔️' : char.class === 'Pícaro' ? '🗡️' : '🛡️'}
+                      </div>
+                      <span style={{ fontWeight: 'bold', display: 'block' }}>{char.name}</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--secondary)' }}>{char.race} • {char.class}</span>
+                      {isBusy && (
+                        <span style={{ 
+                          display: 'block', 
+                          fontSize: '0.72rem', 
+                          color: '#ff6b6b', 
+                          marginTop: '0.5rem',
+                          fontWeight: '600'
+                        }}>
+                          ⚔️ En campaña: {characterCampaigns[char.id]}
+                        </span>
+                      )}
                     </div>
-                    <span style={{ fontWeight: 'bold', display: 'block' }}>{char.name}</span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--secondary)' }}>{char.race} • {char.class}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

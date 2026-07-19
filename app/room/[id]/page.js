@@ -6,6 +6,38 @@ import { supabase } from '../../../lib/supabaseClient';
 import { useRoomState } from '../../../lib/useRoomState';
 import TypewriterText from '../../../components/TypewriterText';
 
+const SPELL_LIBRARY = [
+  // Tier 1 (Level 1+)
+  { name: 'Proyectil Mágico', tier: 1, type: 'Daño', desc: 'Lanza tres dardos de fuerza pura que golpean infaliblemente a tus enemigos.' },
+  { name: 'Curar Heridas Leves', tier: 1, type: 'Curación', desc: 'Restaura una pequeña cantidad de HP a ti o a un aliado cercano.' },
+  { name: 'Escudo de Fuerza', tier: 1, type: 'Defensa', desc: 'Crea una barrera mágica invisible que te protege de los ataques de este turno.' },
+  { name: 'Luz Divina', tier: 1, type: 'Utilidad', desc: 'Ilumina una habitación oscura o ciega temporalmente a un enemigo.' },
+
+  // Tier 2 (Level 2+)
+  { name: 'Bola de Fuego Menor', tier: 2, type: 'Daño', desc: 'Lanza una pequeña esfera explosiva de fuego que daña a varios enemigos cercanos.' },
+  { name: 'Curar Heridas Moderadas', tier: 2, type: 'Curación', desc: 'Cierra heridas de mediana gravedad, sanando de forma más eficaz.' },
+  { name: 'Invisibilidad Temporal', tier: 2, type: 'Utilidad', desc: 'Te desvaneces en el aire, haciéndote indetectable durante unos momentos.' },
+  { name: 'Pasos de Viento', tier: 2, type: 'Movimiento', desc: 'Tus pies se vuelven increíblemente rápidos, permitiéndote esquivar o correr a gran velocidad.' },
+
+  // Tier 3 (Level 3+)
+  { name: 'Relámpago Lineal', tier: 3, type: 'Daño', desc: 'Un arco eléctrico cruza el aire golpeando severamente a todos los enemigos en línea recta.' },
+  { name: 'Sanación Mayor', tier: 3, type: 'Curación', desc: 'Una ola de energía curativa restaura una gran cantidad de HP.' },
+  { name: 'Barrera Telequinética', tier: 3, type: 'Defensa', desc: 'Crea un muro invisible capaz de desviar proyectiles físicos y mágicos.' },
+  { name: 'Vuelo Arcano', tier: 3, type: 'Movimiento', desc: 'Te elevas del suelo y puedes volar libremente por el aire durante este turno.' },
+
+  // Tier 4 (Level 4+)
+  { name: 'Ventisca Helada', tier: 4, type: 'Daño', desc: 'Crea un torbellino de granizo y hielo que congela y ralentiza a los enemigos en el área.' },
+  { name: 'Piel de Piedra', tier: 4, type: 'Defensa', desc: 'Tu piel se endurece como el granito, reduciendo a la mitad todo el daño físico recibido.' },
+  { name: 'Teletransportación Corta', tier: 4, type: 'Movimiento', desc: 'Te desvaneces y reapareces instantáneamente en cualquier lugar visible a corta distancia.' },
+  { name: 'Invocar Golem', tier: 4, type: 'Utilidad', desc: 'Invocas a un siervo de piedra temporal para que te defienda y pelee por ti.' },
+
+  // Tier 5 (Level 5+)
+  { name: 'Desintegración', tier: 5, type: 'Daño', desc: 'Lanza un rayo verde que inflige daño masivo y convierte al objetivo en polvo si es derrotado.' },
+  { name: 'Restauración Completa', tier: 5, type: 'Curación', desc: 'Sana por completo todas las heridas y remueve todos los estados negativos de un aventurero.' },
+  { name: 'Control Temporal', tier: 5, type: 'Utilidad', desc: 'Ralentizas el tiempo a tu alrededor para actuar dos veces o esquivar un peligro seguro.' },
+  { name: 'Deseo Menor', tier: 5, type: 'Utilidad', desc: 'Alteras levemente la realidad para obtener una ventaja narrativa directa del Game Master.' }
+];
+
 export default function GameRoom() {
   const router = useRouter();
   const params = useParams();
@@ -27,10 +59,16 @@ export default function GameRoom() {
   const [modalPlayer, setModalPlayer] = useState(null);
 
   // Spectator mode for dead players
-  const [isSpectating, setIsSpectating] = useState(false);
+  const [isSpectating, setIsSpectating] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(`spectating_${roomId}`) === 'true';
+    }
+    return false;
+  });
 
   // Scroll anchor for chat
   const chatEndRef = useRef(null);
+  const isInitialScrollRef = useRef(true);
 
   const [user, setUser] = useState(null);
 
@@ -38,11 +76,28 @@ export default function GameRoom() {
   useEffect(() => {
     const storedUser = localStorage.getItem('rpg_user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      supabase
+        .from('users')
+        .select('id')
+        .eq('id', parsedUser.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data) {
+            localStorage.removeItem('rpg_user');
+            setUser(null);
+            router.push('/');
+          } else {
+            setUser(parsedUser);
+          }
+        });
     } else {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('redirect_room', roomId);
+      }
       router.push('/');
     }
-  }, [router]);
+  }, [roomId, router]);
 
   // Check if player has a valid registration in this room
   useEffect(() => {
@@ -61,7 +116,14 @@ export default function GameRoom() {
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) {
+      if (isInitialScrollRef.current) {
+        chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        isInitialScrollRef.current = false;
+      } else {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
   }, [messages]);
 
   // Redirect to end summary page when room status changes to finished
@@ -172,6 +234,50 @@ export default function GameRoom() {
       setSubmitting(false);
     }
   };
+
+  const handleLearnSpell = async (spellName) => {
+    setSubmitting(true);
+    try {
+      const currentStats = currentPlayer.stats || {};
+      const currentSpells = currentStats.spells || [];
+      if (currentSpells.includes(spellName)) return;
+
+      const updatedSpells = [...currentSpells, spellName];
+      const updatedStats = {
+        ...currentStats,
+        spells: updatedSpells
+      };
+
+      const { error: updateError } = await supabase
+        .from('players')
+        .update({ stats: updatedStats })
+        .eq('id', currentPlayer.id);
+
+      if (updateError) throw updateError;
+    } catch (err) {
+      console.error('Error al aprender el conjuro:', err);
+      alert('Error al aprender el conjuro: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCastSpell = (spellName) => {
+    setInputText(`Lanzo [${spellName}] para `);
+    setMessageType('action');
+    setTimeout(() => {
+      const textarea = document.querySelector('textarea[placeholder*="Describe tu acción"]');
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      }
+    }, 100);
+  };
+
+  const hasMagic = currentPlayer && (
+    ['Mago', 'Clérigo', 'Bardo'].includes(currentPlayer.class) || 
+    (currentPlayer.magia ?? 10) >= 12
+  );
 
   return (
     <div style={styles.container}>
@@ -391,7 +497,10 @@ export default function GameRoom() {
                 <div style={styles.deathButtonsRow}>
                   <button 
                     className="btn" 
-                    onClick={() => setIsSpectating(true)}
+                    onClick={() => {
+                      setIsSpectating(true);
+                      localStorage.setItem(`spectating_${roomId}`, 'true');
+                    }}
                     style={styles.spectateBtn}
                   >
                     👁️ Observar como Espectador
@@ -446,6 +555,17 @@ export default function GameRoom() {
                   >
                     Realizar Acción
                   </button>
+                  {hasMagic && (
+                    <button 
+                      style={{
+                        ...styles.toggleTab,
+                        ...(messageType === 'spells' ? styles.toggleTabActive : {})
+                      }}
+                      onClick={() => setMessageType('spells')}
+                    >
+                      🪄 Libro de Hechizos
+                    </button>
+                  )}
                 </div>
 
                 {/* If Out-Of-Character Chat is Active */}
@@ -496,6 +616,114 @@ export default function GameRoom() {
                     )}
                   </div>
                 )}
+
+                {/* If Spellbook Console is Active */}
+                {messageType === 'spells' && (
+                  <div style={styles.spellsConsole}>
+                    {/* Spell slots status */}
+                    <div style={styles.spellsHeader}>
+                      <h3 style={{ margin: 0 }}>Libro de Hechizos</h3>
+                      <span style={styles.spellSlotsBadge}>
+                        Hechizos: {currentPlayer.stats?.spells?.length || 0} / {(currentPlayer.stats?.Level ?? 1) + 2} preparados
+                      </span>
+                    </div>
+
+                    {/* Learn spells notification */}
+                    {(() => {
+                      const maxSpells = (currentPlayer.stats?.Level ?? 1) + 2;
+                      const learnedSpells = currentPlayer.stats?.spells || [];
+                      const slotsAvailable = maxSpells - learnedSpells.length;
+                      if (slotsAvailable > 0) {
+                        return (
+                          <div style={styles.learnAlert}>
+                            ✨ Tienes <strong>{slotsAvailable}</strong> ranura(s) de conjuro disponibles para aprender nuevos hechizos de Nivel {currentPlayer.stats?.Level ?? 1} o menor.
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* Spells Grid */}
+                    <div style={styles.spellsSplitGrid}>
+                      
+                      {/* Left: Prepared Spells */}
+                      <div style={styles.spellsColumn}>
+                        <h4 style={styles.spellsColumnTitle}>Conjuros Preparados</h4>
+                        <div style={styles.spellsList}>
+                          {(!currentPlayer.stats?.spells || currentPlayer.stats.spells.length === 0) ? (
+                            <p style={styles.emptySpellsText}>No tienes conjuros preparados. Aprende algunos de la biblioteca a la derecha.</p>
+                          ) : (
+                            currentPlayer.stats.spells.map((spellName) => {
+                              const spell = SPELL_LIBRARY.find(s => s.name === spellName) || { name: spellName, desc: 'Conjuro misterioso.', type: 'Desconocido', tier: 1 };
+                              return (
+                                <div key={spell.name} style={styles.spellCard}>
+                                  <div style={styles.spellCardMeta}>
+                                    <span style={styles.spellCardName}>🪄 {spell.name}</span>
+                                    <span style={styles.spellCardTier}>Nivel {spell.tier} • {spell.type}</span>
+                                  </div>
+                                  <p style={styles.spellCardDesc}>{spell.desc}</p>
+                                  <button 
+                                    className="btn" 
+                                    onClick={() => handleCastSpell(spell.name)}
+                                    style={styles.castBtn}
+                                    disabled={submitting}
+                                  >
+                                    Lanzar Hechizo
+                                  </button>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right: Available Spells to Learn */}
+                      <div style={styles.spellsColumn}>
+                        <h4 style={styles.spellsColumnTitle}>Biblioteca de Hechizos (Nivel {currentPlayer.stats?.Level ?? 1})</h4>
+                        <div style={styles.spellsList}>
+                          {(() => {
+                            const currentLvl = currentPlayer.stats?.Level ?? 1;
+                            const learnedSpells = currentPlayer.stats?.spells || [];
+                            const maxSpells = currentLvl + 2;
+                            const hasSlots = learnedSpells.length < maxSpells;
+                            
+                            // Filter spells that the player is eligible to learn (tier <= current player level) and hasn't learned yet
+                            const availableToLearn = SPELL_LIBRARY.filter(
+                              s => s.tier <= currentLvl && !learnedSpells.includes(s.name)
+                            );
+
+                            if (availableToLearn.length === 0) {
+                              return <p style={styles.emptySpellsText}>Has aprendido todos los hechizos disponibles para tu nivel actual.</p>;
+                            }
+
+                            return availableToLearn.map((spell) => (
+                              <div key={spell.name} style={{...styles.spellCard, backgroundColor: '#0b111e', borderColor: '#1e293b'}}>
+                                <div style={styles.spellCardMeta}>
+                                  <span style={{...styles.spellCardName, color: 'var(--secondary)'}}>{spell.name}</span>
+                                  <span style={styles.spellCardTier}>Nivel {spell.tier} • {spell.type}</span>
+                                </div>
+                                <p style={styles.spellCardDesc}>{spell.desc}</p>
+                                <button 
+                                  className="btn enter-btn" 
+                                  onClick={() => handleLearnSpell(spell.name)}
+                                  disabled={submitting || !hasSlots}
+                                  style={{
+                                    ...styles.castBtn,
+                                    opacity: hasSlots ? 1 : 0.5,
+                                    cursor: hasSlots ? 'pointer' : 'not-allowed'
+                                  }}
+                                >
+                                  Aprender
+                                </button>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -539,6 +767,19 @@ export default function GameRoom() {
                   {modalPlayer.skills.map((skill, sIdx) => (
                     <span key={sIdx} className="creator-badge" style={{ background: '#1e293b', border: '1px solid var(--border)', textTransform: 'none', fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginLeft: 0 }}>
                       {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {modalPlayer.stats?.spells && modalPlayer.stats.spells.length > 0 && (
+              <div style={styles.modalSection}>
+                <h4>Conjuros Preparados</h4>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                  {modalPlayer.stats.spells.map((spell, sIdx) => (
+                    <span key={sIdx} className="creator-badge" style={{ background: '#1e1b4b', border: '1px solid #4338ca', textTransform: 'none', fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginLeft: 0 }}>
+                      🪄 {spell}
                     </span>
                   ))}
                 </div>
@@ -1092,5 +1333,106 @@ const styles = {
   },
   spectatorLeaveBtn: {
     padding: '0.5rem 1.25rem',
+  },
+  spellsConsole: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+    maxHeight: '380px',
+    overflowY: 'auto',
+  },
+  spellsHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px solid var(--border)',
+    paddingBottom: '0.5rem',
+  },
+  spellSlotsBadge: {
+    fontSize: '0.8rem',
+    backgroundColor: '#1e1b4b',
+    color: '#a5b4fc',
+    padding: '0.2rem 0.6rem',
+    borderRadius: '4px',
+    border: '1px solid #4338ca',
+    fontWeight: '600',
+  },
+  learnAlert: {
+    backgroundColor: 'rgba(99, 102, 241, 0.08)',
+    border: '1px solid rgba(99, 102, 241, 0.25)',
+    borderRadius: '6px',
+    padding: '0.6rem 1rem',
+    fontSize: '0.85rem',
+    color: '#a5b4fc',
+  },
+  spellsSplitGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '1.5rem',
+    height: '280px',
+  },
+  spellsColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.75rem',
+    overflowY: 'auto',
+    paddingRight: '0.5rem',
+  },
+  spellsColumnTitle: {
+    fontSize: '0.9rem',
+    fontWeight: '700',
+    color: 'var(--secondary)',
+    margin: 0,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  spellsList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.75rem',
+  },
+  spellCard: {
+    backgroundColor: '#151f32',
+    border: '1px solid var(--border)',
+    borderRadius: '6px',
+    padding: '0.8rem 1rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.4rem',
+  },
+  spellCardMeta: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  spellCardName: {
+    fontWeight: 'bold',
+    fontSize: '0.9rem',
+    color: '#a5b4fc',
+  },
+  spellCardTier: {
+    fontSize: '0.7rem',
+    color: 'var(--secondary)',
+  },
+  spellCardDesc: {
+    margin: 0,
+    fontSize: '0.8rem',
+    color: 'var(--foreground)',
+    lineHeight: '1.4',
+    opacity: 0.85,
+  },
+  castBtn: {
+    alignSelf: 'flex-end',
+    padding: '0.25rem 0.75rem',
+    fontSize: '0.75rem',
+    marginTop: '0.25rem',
+  },
+  emptySpellsText: {
+    fontSize: '0.8rem',
+    color: 'var(--secondary)',
+    fontStyle: 'italic',
+    margin: 0,
+    padding: '1rem 0',
+    textAlign: 'center',
   },
 };

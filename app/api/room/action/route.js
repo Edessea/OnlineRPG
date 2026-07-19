@@ -144,7 +144,7 @@ export async function POST(request) {
     const playerListText = allPlayers
       .map(
         (p) =>
-          `- ID: "${p.id}", Nombre: "${p.name}", Raza: "${p.race}", Clase: "${p.class}", HP: ${p.stats?.HP ?? 100}/${p.salud ?? 100}, Nivel: ${p.stats?.Level ?? 1}, XP: ${p.stats?.XP ?? 0}, Fuerza: ${p.fuerza ?? 10}, Destreza: ${p.destreza ?? 10}, Magia: ${p.magia ?? 10}, Carisma: ${p.carisma ?? 10}, Inteligencia: ${p.inteligencia ?? 10}, Habilidades: [${(p.skills || []).join(', ')}], Orden de unión: ${p.join_order}`
+          `- ID: "${p.id}", Nombre: "${p.name}", Raza: "${p.race}", Clase: "${p.class}", HP: ${p.stats?.HP ?? 100}/${p.salud ?? 100}, Nivel: ${p.stats?.Level ?? 1}, XP: ${p.stats?.XP ?? 0}, Fuerza: ${p.fuerza ?? 10}, Destreza: ${p.destreza ?? 10}, Magia: ${p.magia ?? 10}, Carisma: ${p.carisma ?? 10}, Inteligencia: ${p.inteligencia ?? 10}, Habilidades: [${(p.skills || []).join(', ')}], Conjuros Preparados: [${(p.stats?.spells || []).join(', ')}], Orden de unión: ${p.join_order}`
       )
       .join('\n');
 
@@ -190,6 +190,7 @@ INSTRUCCIONES PARA TU RESPUESTA:
 1. Actúa como el Game Master (GM). Evalúa si la acción declarada por el jugador requiere una tirada de dados para resolverse (ej: atacar, forzar cerraduras, esquivar trampas o escalar rocas requieren tirada de dados; mientras que hablar con otros, mirar a su alrededor, caminar por pasillos vacíos o esperar de pie NO requieren tiradas de dados).
    - Establece "dice_roll_used" en true si la tirada de dado es requerida para este desenlace. En este caso, evalúa el tiro provisto (${roll} de ${maxRoll}) para narrar el resultado en "gm_message".
    - Establece "dice_roll_used" en false si no se requiere tirada de dados. Narra el desenlace directamente sin penalizar/beneficiar según el número del dado.
+   - En ambos casos, escribe el resultado en "gm_message" de forma extremadamente breve, concisa y directa (máximo 2 o 3 frases cortas). Evita cualquier descripción detallada de personajes, el entorno, el brillo o glinto de las armas, o poses de combate. Ve directo a las consecuencias.
 2. Determina el modo de turnos para el siguiente ciclo de juego en "next_turn_mode" ('free' o 'ordered'). Si se inicia un combate o un evento de riesgo inmediato que requiera turnos estrictos, cámbialo a 'ordered'. Si la situación está en calma o la lucha terminó, déjalo o regrésalo a 'free'.
 3. Rotación de Turno ("next_player_id"):
    - Si "next_turn_mode" es "ordered", selecciona el ID del jugador al que le toca actuar en la rotación según join_order.
@@ -215,7 +216,7 @@ INSTRUCCIONES PARA TU RESPUESTA:
       }
     });
 
-    const systemInstruction = `Eres un Game Master y Narrador de fantasía medieval para un juego de rol de mesa interactivo. Tu prosa es rica, cautivadora y descriptiva. Debes seguir fielmente el esquema JSON y evaluar el tiro de dados para describir las consecuencias lógicas de las acciones en español.`;
+    const systemInstruction = `Eres un Game Master y Narrador de fantasía medieval para un juego de rol de mesa interactivo. Escribes en español. Sé extremadamente breve, directo y conciso en tus respuestas (máximo 2 o 3 frases cortas por narración). Evita descripciones largas, poéticas o floridas de personajes, objetos, armas o el entorno. Concéntrate en la consecuencia de la acción y en mantener dinámico el juego. Debes seguir fielmente el esquema JSON y evaluar el tiro de dados para describir las consecuencias lógicas de las acciones.`;
 
     console.log('--- GEMINI ACTION ROUTE PROMPT ---');
     console.log(prompt);
@@ -304,10 +305,27 @@ INSTRUCCIONES PARA TU RESPUESTA:
           // Clamp HP to prevent negative HP or overflow (e.g. 0 to 100)
           mergedStats.HP = Math.max(0, Math.min(100, mergedStats.HP));
 
+          // Enforce auto-leveling based on XP
+          const oldLevel = currentPlayerObj.stats?.Level ?? 1;
+          const xp = mergedStats.XP ?? 0;
+          const calculatedLevel = Math.max(1, Math.floor(xp / 1000) + 1);
+          mergedStats.Level = calculatedLevel;
+
           await supabase
             .from('players')
             .update({ stats: mergedStats })
             .eq('id', up.id);
+
+          if (calculatedLevel > oldLevel) {
+            // Level up! Insert system log in the chat room
+            await supabase.from('messages').insert([
+              {
+                room_id: roomUuid,
+                sender_type: 'system',
+                content: `🎉 ¡${currentPlayerObj.name} ha subido al Nivel ${calculatedLevel}! 🎉`
+              }
+            ]);
+          }
         }
       }
     }

@@ -82,10 +82,11 @@ AVENTUREROS REGISTRADOS EN ESTA CAMPAÑA:
 ${playerListText}
 
 REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
-1. Escribe una introducción breve pero que enganche inmediatamente a los jugadores.
-2. Termina llamando al grupo a la acción y cediendo la palabra a los jugadores.
-3. Devuelve un JSON que contenga:
-   - "welcome_message": La narración literaria detallada.
+1. Escribe una introducción extremadamente breve y concisa (máximo 3 frases cortas) que sitúe a los jugadores directamente en la acción.
+2. Evita descripciones largas y floridas de personajes, equipamiento o del entorno.
+3. Termina llamando al grupo a la acción y cediendo la palabra a los jugadores.
+4. Devuelve un JSON que contenga:
+   - "welcome_message": La narración literaria extremadamente breve.
    - "initial_context": El registro inicial de la bitácora de la campaña, estableciendo las bases del quest, el grupo reunido en modo libre y el trasfondo inicial de la campaña para las futuras anexiones de memoria.
 `;
 
@@ -102,7 +103,7 @@ REGLAS CRÍTICAS PARA LA NARRACIÓN DE APERTURA:
       }
     });
 
-    const systemInstruction = `Eres un Game Master y Narrador de fantasía de alta calidad. Escribes en español con prosa descriptiva e inmersiva. Sigues al pie de la letra el formato JSON y la consigna de que los jugadores se conocen por primera vez.`;
+    const systemInstruction = `Eres un Game Master y Narrador de fantasía medieval. Escribes en español. Sé extremadamente breve, conciso y directo (máximo 3 frases cortas). Evita descripciones largas, poéticas o floridas de personajes, armas o entornos. Ve directo a la acción. Sigues al pie de la letra el formato JSON y la consigna de que los jugadores se conocen por primera vez.`;
 
     console.log('--- GEMINI START ROUTE PROMPT ---');
     console.log(prompt);

@@ -71,6 +71,9 @@ export default function CampaignEnd() {
               const hp = p.stats?.HP ?? 0;
               const lvl = p.stats?.Level ?? 1;
               const xp = p.stats?.XP ?? 0;
+              const relativeXP = xp % 1000;
+              const nextLevelXP = 1000;
+              const xpPercent = (relativeXP / nextLevelXP) * 100;
 
               return (
                 <div key={p.id} style={styles.playerRow}>
@@ -94,11 +97,11 @@ export default function CampaignEnd() {
 
                     {/* Level / XP */}
                     <div style={styles.statContainer}>
-                      <span style={styles.statLabel}>Nivel {lvl} • XP: {xp}/100</span>
+                      <span style={styles.statLabel}>Nivel {lvl} • XP: {relativeXP}/{nextLevelXP}</span>
                       <div style={styles.progressBarBg}>
                         <div style={{
                           ...styles.progressBarFill,
-                          width: `${xp}%`,
+                          width: `${xpPercent}%`,
                           backgroundColor: 'var(--accent)'
                         }} />
                       </div>

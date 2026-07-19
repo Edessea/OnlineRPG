@@ -92,6 +92,18 @@ export default function Home() {
   const fetchUserData = async (userId) => {
     setFetchingData(true);
     try {
+      // 0. Verify user still exists in database
+      const { data: dbUser, error: userCheckErr } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (userCheckErr || !dbUser) {
+        handleLogout();
+        return;
+      }
+
       // 1. Fetch characters
       const { data: charData, error: charErr } = await supabase
         .from('characters')
@@ -190,6 +202,14 @@ export default function Home() {
         const loggedInUser = { id: data.id, username: data.username };
         localStorage.setItem('rpg_user', JSON.stringify(loggedInUser));
         setUser(loggedInUser);
+        if (typeof window !== 'undefined') {
+          const redirectRoom = sessionStorage.getItem('redirect_room');
+          if (redirectRoom) {
+            sessionStorage.removeItem('redirect_room');
+            router.push(`/room/${redirectRoom}`);
+            return;
+          }
+        }
         fetchUserData(loggedInUser.id);
       } else {
         // Registrarse (Signup)
@@ -217,6 +237,14 @@ export default function Home() {
         const loggedInUser = { id: newUser.id, username: newUser.username };
         localStorage.setItem('rpg_user', JSON.stringify(loggedInUser));
         setUser(loggedInUser);
+        if (typeof window !== 'undefined') {
+          const redirectRoom = sessionStorage.getItem('redirect_room');
+          if (redirectRoom) {
+            sessionStorage.removeItem('redirect_room');
+            router.push(`/room/${redirectRoom}`);
+            return;
+          }
+        }
         fetchUserData(loggedInUser.id);
       }
     } catch (err) {
@@ -329,7 +357,7 @@ export default function Home() {
         setCodeDigits(cleanId.split(''));
         inputRefs[4].current?.focus();
       } else {
-        router.push(`/room/${cleanId}/character`);
+        router.push(`/room/${cleanId}`);
       }
     }
   };
@@ -344,7 +372,7 @@ export default function Home() {
       return;
     }
 
-    router.push(`/room/${code}/character`);
+    router.push(`/room/${code}`);
   };
 
   const handleDragStart = (e, index, value) => {

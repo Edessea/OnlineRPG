@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { supabase } from '../../../../lib/supabaseClient';
+import { SPELL_LIBRARY } from '../../../../lib/spells';
 
 // Enforce schema constraint on Gemini response
 const responseSchema = {
@@ -38,7 +39,9 @@ const responseSchema = {
             properties: {
               HP: { type: SchemaType.INTEGER },
               Level: { type: SchemaType.INTEGER },
-              XP: { type: SchemaType.INTEGER }
+              XP: { type: SchemaType.INTEGER },
+              MP: { type: SchemaType.INTEGER },
+              sleeping_rounds: { type: SchemaType.INTEGER }
             },
             required: ["HP", "Level", "XP"]
           }
@@ -65,6 +68,10 @@ const responseSchema = {
     campaign_outcome: {
       type: SchemaType.STRING,
       description: "Una breve descripción del desenlace final de la campaña (solo si game_status es 'finished'; de lo contrario, puede ser un string vacío)."
+    },
+    roll_attribute: {
+      type: SchemaType.STRING,
+      description: "Si dice_roll_used es true, indica cuál característica o atributo del jugador se usó para evaluar la tirada (ej: 'fuerza', 'destreza', 'magia', 'carisma', 'inteligencia'). De lo contrario, dejar vacío."
     }
   },
   required: [
@@ -84,7 +91,7 @@ const responseSchema = {
 
 export async function POST(request) {
   try {
-    const { roomId, playerId, actionText } = await request.json();
+    const { roomId, playerId, actionText, clientRoll, clientMessageId } = await request.json();
 
     if (!roomId || !playerId || !actionText) {
       return NextResponse.json(
@@ -119,15 +126,55 @@ export async function POST(request) {
     const player = playerRes.data;
     const allPlayers = allPlayersRes.data;
 
+    // Decrement sleeping rounds for any player who is sleeping
+    for (const p of allPlayers) {
+      const stats = p.stats || {};
+      if (stats.sleeping_rounds && stats.sleeping_rounds > 0) {
+        const newRounds = stats.sleeping_rounds - 1;
+        const updatedStats = {
+          ...stats,
+          sleeping_rounds: newRounds
+        };
+        if (newRounds === 0) {
+          // Woke up! Restore HP and MP
+          updatedStats.HP = p.salud ?? 100;
+          updatedStats.MP = stats.MaxMP ?? (p.magia ?? 10);
+          
+          // Insert system message about waking up
+          await supabase.from('messages').insert([
+            {
+              room_id: roomUuid,
+              sender_type: 'system',
+              content: `💤 ¡${p.name} se ha despertado totalmente recuperado (Vida: ${updatedStats.HP} HP, Magia: ${updatedStats.MP} PM)!`
+            }
+          ]);
+        }
+        
+        // Save to database
+        await supabase
+          .from('players')
+          .update({ stats: updatedStats })
+          .eq('id', p.id);
+        
+        // Update local copies
+        p.stats = updatedStats;
+        if (p.id === player.id) {
+          player.stats = updatedStats;
+        }
+      }
+    }
+
     // Backend turn enforcer guard (only when in ordered mode!)
     if (room.turn_mode === 'ordered' && room.active_player_id !== playerId) {
       return NextResponse.json({ error: 'No es tu turno de juego.' }, { status: 403 });
     }
 
-    // 2. Compute Pre-generated Dice Roll
+    // 2. Compute Pre-generated Dice Roll (use clientRoll if provided)
     const diceType = room.current_dice_type || 'D20';
     const maxRoll = parseInt(diceType.replace('D', ''), 10) || 20;
-    const roll = Math.floor(Math.random() * maxRoll) + 1;
+    const roll = clientRoll !== undefined && clientRoll !== null 
+      ? clientRoll 
+      : (Math.floor(Math.random() * maxRoll) + 1);
 
     // 3. Fetch last 15 messages for conversational history
     const { data: recentMsgs, error: fetchMsgsErr } = await supabase
@@ -143,8 +190,13 @@ export async function POST(request) {
     // 6. Build prompts for Gemini
     const playerListText = allPlayers
       .map(
-        (p) =>
-          `- ID: "${p.id}", Nombre: "${p.name}", Raza: "${p.race}", Clase: "${p.class}", HP: ${p.stats?.HP ?? 100}/${p.salud ?? 100}, Nivel: ${p.stats?.Level ?? 1}, XP: ${p.stats?.XP ?? 0}, Fuerza: ${p.fuerza ?? 10}, Destreza: ${p.destreza ?? 10}, Magia: ${p.magia ?? 10}, Carisma: ${p.carisma ?? 10}, Inteligencia: ${p.inteligencia ?? 10}, Habilidades: [${(p.skills || []).join(', ')}], Conjuros Preparados: [${(p.stats?.spells || []).join(', ')}], Orden de unión: ${p.join_order}`
+        (p) => {
+          const hasMagic = ['Mago', 'Clérigo', 'Bardo'].includes(p.class) || (p.magia ?? 10) >= 12;
+          const eligibleSpells = hasMagic
+            ? SPELL_LIBRARY.filter(s => s.tier <= (p.stats?.Level ?? 1)).map(s => s.name)
+            : [];
+          return `- ID: "${p.id}", Nombre: "${p.name}", Raza: "${p.race}", Clase: "${p.class}", HP: ${p.stats?.HP ?? 100}/${p.salud ?? 100}, PM: ${p.stats?.MP ?? 0}/${p.stats?.MaxMP ?? (p.magia ?? 10)}, Nivel: ${p.stats?.Level ?? 1}, XP: ${p.stats?.XP ?? 0}, Fuerza: ${p.fuerza ?? 10}, Destreza: ${p.destreza ?? 10}, Magia: ${p.magia ?? 10}, Carisma: ${p.carisma ?? 10}, Inteligencia: ${p.inteligencia ?? 10}, Habilidades: [${(p.skills || []).join(', ')}], Conjuros Disponibles: [${eligibleSpells.join(', ')}], Orden de unión: ${p.join_order}`;
+        }
       )
       .join('\n');
 
@@ -188,17 +240,22 @@ Resultado del tiro de dado en caso de ser necesario (${diceType}): sacó un ${ro
 
 INSTRUCCIONES PARA TU RESPUESTA:
 1. Actúa como el Game Master (GM). Evalúa si la acción declarada por el jugador requiere una tirada de dados para resolverse (ej: atacar, forzar cerraduras, esquivar trampas o escalar rocas requieren tirada de dados; mientras que hablar con otros, mirar a su alrededor, caminar por pasillos vacíos o esperar de pie NO requieren tiradas de dados).
-   - Establece "dice_roll_used" en true si la tirada de dado es requerida para este desenlace. En este caso, evalúa el tiro provisto (${roll} de ${maxRoll}) para narrar el resultado en "gm_message".
-   - Establece "dice_roll_used" en false si no se requiere tirada de dados. Narra el desenlace directamente sin penalizar/beneficiar según el número del dado.
-   - En ambos casos, escribe el resultado en "gm_message" de forma extremadamente breve, concisa y directa (máximo 2 o 3 frases cortas). Evita cualquier descripción detallada de personajes, el entorno, el brillo o glinto de las armas, o poses de combate. Ve directo a las consecuencias.
+   - Establece "dice_roll_used" en true si la tirada de dado es requerida para este desenlace. En este caso, evalúa el tiro provisto (${roll} de ${maxRoll}) para narrar el resultado en "gm_message". Además, en el campo "roll_attribute", especifica obligatoriamente sobre qué atributo/característica se basa la tirada (ej: "fuerza", "destreza", "inteligencia", "carisma", "magia").
+   - Establece "dice_roll_used" en false si no se requiere tirada de dados. Narra el desenlace directamente sin penalizar/beneficiar según el número del dado. Dejar "roll_attribute" vacío o nulo en este caso.
+   - En ambos casos, escribe el resultado en "gm_message" de forma narrativa, descriptiva y envolvente (aproximadamente entre 1 y 2 párrafos cortos, de 5 a 8 frases en total). Narra las consecuencias directas de la acción aportando atmósfera e inmersión, pero **SIEMPRE finaliza tu narración con un nuevo 'hilo del que tirar' (una pista, dilema, suceso inminente, obstáculo o pregunta abierta)** para dar dirección y momentum a los jugadores (ej: escuchas un murmullo detrás de la pared, ves una palanca cubierta de polvo, el enemigo herido retrocede buscando huir, o el aire empieza a enfriarse repentinamente). Evita dejar la escena estática o vacía para que el jugador no tenga que inventarse la trama para avanzar.
 2. Determina el modo de turnos para el siguiente ciclo de juego en "next_turn_mode" ('free' o 'ordered'). Si se inicia un combate o un evento de riesgo inmediato que requiera turnos estrictos, cámbialo a 'ordered'. Si la situación está en calma o la lucha terminó, déjalo o regrésalo a 'free'.
 3. Rotación de Turno ("next_player_id"):
    - Si "next_turn_mode" es "ordered", selecciona el ID del jugador al que le toca actuar en la rotación según join_order.
    - Si "next_turn_mode" es "free", establece "next_player_id" como un string vacío "".
-4. Modificaciones de HP/XP:
+4. Modificaciones de HP/XP y Estado de Sueño:
    - Modifica las estadísticas en "updated_players" cuando sea necesario. Si falló gravemente en una acción peligrosa, resta HP de manera justa. Otorga XP por progresos y buenas ideas.
-5. Ilustración Escénica:
-   - Si ocurre algo memorable, genera un prompt descriptivo en inglés en "image_prompt" y activa "is_critical_moment".
+   - REGLAS DE SUEÑO/DESCANSO: Si el jugador activo declara que intenta dormir/descansar:
+     * Esta acción NUNCA requiere tirada de dados. Debes establecer obligatoriamente "dice_roll_used" en false.
+     * Evalúa las circunstancias ambientales o el entorno. Si el lugar o la situación hacen que sea imposible dormir (ej: combate activo, monstruos atacando, trampas disparando, clima extremo sin refugio, o ruido ensordecedor), niégalo narrativamente en "gm_message" y NO agregues "sleeping_rounds" (o déjalo en 0) en la respuesta.
+     * Si las circunstancias permiten descansar (la zona está tranquila o asegurada, no hay enemigos activos), apruébalo narrando cómo cae dormido y agregando al jugador en "updated_players" con "sleeping_rounds" establecido en 2.
+5. Ilustración Escénica (Extremadamente selectiva):
+   - Sé muy restrictivo al generar ilustraciones. Establece "is_critical_moment" en true ÚNICAMENTE cuando ocurra un evento crítico, dramático o memorable de gran impacto en la historia (ej: derrotar a un jefe principal, encontrar un artefacto legendario, la caída o desmayo de un aventurero, una emboscada masiva, o un giro narrativo mayor).
+   - Para acciones ordinarias (abrir puertas normales, combates contra monstruos menores, descansar, hablar, observar salas), debes dejar obligatoriamente "is_critical_moment" en false y no proveer "image_prompt".
 6. Contexto de Memoria:
    - Modifica y extiende la bitácora "updated_gm_context" en tu respuesta. Este campo es tu diario persistente de la campaña y recopila la historia entera. No olvides los sucesos de turnos anteriores; al contrario, resume brevemente la resolución de la acción de este turno y agrégala al final de la bitácora acumulada, preservando todos los hechos memorables e importantes que han ocurrido en la campaña para asegurar la coherencia del mundo en futuros turnos.
 `;
@@ -216,7 +273,7 @@ INSTRUCCIONES PARA TU RESPUESTA:
       }
     });
 
-    const systemInstruction = `Eres un Game Master y Narrador de fantasía medieval para un juego de rol de mesa interactivo. Escribes en español. Sé extremadamente breve, directo y conciso en tus respuestas (máximo 2 o 3 frases cortas por narración). Evita descripciones largas, poéticas o floridas de personajes, objetos, armas o el entorno. Concéntrate en la consecuencia de la acción y en mantener dinámico el juego. Debes seguir fielmente el esquema JSON y evaluar el tiro de dados para describir las consecuencias lógicas de las acciones.`;
+    const systemInstruction = `Eres un Game Master y Narrador de fantasía medieval para un juego de rol de mesa interactivo. Escribes en español. Narra de forma envolvente, inmersiva y natural (aproximadamente 1 o 2 párrafos cortos, de 5 a 8 frases en total), dando buena atmósfera a tus descripciones sin ser redundante. Concéntrate en la consecuencia de la acción y en mantener dinámico el juego. Siempre finaliza tu narración con un nuevo 'hilo del que tirar' (un misterio, suceso inminente, pista, obstáculo o pregunta abierta) para guiar y dar dirección a los jugadores, evitando que tengan que inventarse la historia ellos mismos. Debes seguir fielmente el esquema JSON y evaluar el tiro de dados para describir las consecuencias lógicas de las acciones. Sé extremadamente restrictivo con las ilustraciones: solo pon is_critical_moment en true en momentos épicos, trágicos o hitos de gran importancia. Para acciones normales del día a día o combates menores, no generes ilustraciones.`;
 
     console.log('--- GEMINI ACTION ROUTE PROMPT ---');
     console.log(prompt);
@@ -239,26 +296,37 @@ INSTRUCCIONES PARA TU RESPUESTA:
       finalImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${seed}`;
     }
 
-    // B. Insert Player Action message into message logs
-    const { error: msgErr1 } = await supabase.from('messages').insert([
-      {
-        room_id: roomUuid,
-        sender_type: 'player',
-        player_id: playerId,
-        message_type: 'action',
-        content: actionText,
-        dice_roll: gmResponse.dice_roll_used ? roll : null
+    // B. Insert or update Player Action message into message logs
+    if (clientMessageId) {
+      if (!gmResponse.dice_roll_used) {
+        // If GM did not use the roll, clear it from the client-inserted message
+        await supabase
+          .from('messages')
+          .update({ dice_roll: null })
+          .eq('id', clientMessageId);
       }
-    ]);
-    if (msgErr1) throw msgErr1;
+    } else {
+      const { error: msgErr1 } = await supabase.from('messages').insert([
+        {
+          room_id: roomUuid,
+          sender_type: 'player',
+          player_id: playerId,
+          message_type: 'action',
+          content: actionText,
+          dice_roll: gmResponse.dice_roll_used ? roll : null
+        }
+      ]);
+      if (msgErr1) throw msgErr1;
+    }
 
     // C. If dice roll was used, insert system log of the roll
     if (gmResponse.dice_roll_used) {
+      const rollAttr = gmResponse.roll_attribute || 'característica';
       const { error: msgErr2 } = await supabase.from('messages').insert([
         {
           room_id: roomUuid,
           sender_type: 'system',
-          content: `🎲 ${player.name} lanza un ${diceType} sacando un ${roll} para realizar su acción.`
+          content: `🎲 Tienes que tirar un dado de ${diceType} basado en tu ${rollAttr}. ${player.name} saca un ${roll}.`
         }
       ]);
       if (msgErr2) throw msgErr2;
@@ -339,14 +407,27 @@ INSTRUCCIONES PARA TU RESPUESTA:
     };
 
     if (roomUpdates.turn_mode === 'ordered') {
-      // Validate next_player_id is in room
+      // Validate next_player_id is in room and not sleeping
       let finalNextPlayerId = gmResponse.next_player_id;
-      const isValidId = allPlayers.some((p) => p.id === finalNextPlayerId);
-      if (!isValidId) {
-        // Fallback to sequential join order
+      let nextPlayer = allPlayers.find((p) => p.id === finalNextPlayerId);
+      
+      if (!nextPlayer || (nextPlayer.stats?.sleeping_rounds ?? 0) > 0) {
+        // Fallback or rotate to next awake and alive player
         const currentIdx = allPlayers.findIndex((p) => p.id === playerId);
-        const fallbackPlayer = allPlayers[(currentIdx + 1) % allPlayers.length];
-        roomUpdates.active_player_id = fallbackPlayer.id;
+        let found = false;
+        for (let i = 1; i <= allPlayers.length; i++) {
+          const candidate = allPlayers[(currentIdx + i) % allPlayers.length];
+          const isCandSleeping = (candidate.stats?.sleeping_rounds ?? 0) > 0;
+          const candidateHP = gmResponse.updated_players?.find((up) => up.id === candidate.id)?.stats?.HP ?? (candidate.stats?.HP ?? 100);
+          if (!isCandSleeping && candidateHP > 0) {
+            roomUpdates.active_player_id = candidate.id;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          roomUpdates.active_player_id = null; // No one is awake and alive!
+        }
       } else {
         roomUpdates.active_player_id = finalNextPlayerId;
       }
@@ -377,7 +458,12 @@ INSTRUCCIONES PARA TU RESPUESTA:
 
     if (roomUpdateErr) throw roomUpdateErr;
 
-    return NextResponse.json({ success: true, message: 'Turno procesado correctamente por el GM.' });
+    return NextResponse.json({
+      success: true,
+      message: 'Turno procesado correctamente por el GM.',
+      roll: roll,
+      dice_roll_used: gmResponse.dice_roll_used
+    });
   } catch (err) {
     console.error('Error en Action Handler Endpoint:', err);
     let errMsg = err.message || 'Error interno del servidor al procesar el turno.';

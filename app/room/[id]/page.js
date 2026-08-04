@@ -6,37 +6,133 @@ import { supabase } from '../../../lib/supabaseClient';
 import { useRoomState } from '../../../lib/useRoomState';
 import TypewriterText from '../../../components/TypewriterText';
 
-const SPELL_LIBRARY = [
-  // Tier 1 (Level 1+)
-  { name: 'Proyectil Mágico', tier: 1, type: 'Daño', desc: 'Lanza tres dardos de fuerza pura que golpean infaliblemente a tus enemigos.' },
-  { name: 'Curar Heridas Leves', tier: 1, type: 'Curación', desc: 'Restaura una pequeña cantidad de HP a ti o a un aliado cercano.' },
-  { name: 'Escudo de Fuerza', tier: 1, type: 'Defensa', desc: 'Crea una barrera mágica invisible que te protege de los ataques de este turno.' },
-  { name: 'Luz Divina', tier: 1, type: 'Utilidad', desc: 'Ilumina una habitación oscura o ciega temporalmente a un enemigo.' },
+import { SPELL_LIBRARY } from '../../../lib/spells';
 
-  // Tier 2 (Level 2+)
-  { name: 'Bola de Fuego Menor', tier: 2, type: 'Daño', desc: 'Lanza una pequeña esfera explosiva de fuego que daña a varios enemigos cercanos.' },
-  { name: 'Curar Heridas Moderadas', tier: 2, type: 'Curación', desc: 'Cierra heridas de mediana gravedad, sanando de forma más eficaz.' },
-  { name: 'Invisibilidad Temporal', tier: 2, type: 'Utilidad', desc: 'Te desvaneces en el aire, haciéndote indetectable durante unos momentos.' },
-  { name: 'Pasos de Viento', tier: 2, type: 'Movimiento', desc: 'Tus pies se vuelven increíblemente rápidos, permitiéndote esquivar o correr a gran velocidad.' },
-
-  // Tier 3 (Level 3+)
-  { name: 'Relámpago Lineal', tier: 3, type: 'Daño', desc: 'Un arco eléctrico cruza el aire golpeando severamente a todos los enemigos en línea recta.' },
-  { name: 'Sanación Mayor', tier: 3, type: 'Curación', desc: 'Una ola de energía curativa restaura una gran cantidad de HP.' },
-  { name: 'Barrera Telequinética', tier: 3, type: 'Defensa', desc: 'Crea un muro invisible capaz de desviar proyectiles físicos y mágicos.' },
-  { name: 'Vuelo Arcano', tier: 3, type: 'Movimiento', desc: 'Te elevas del suelo y puedes volar libremente por el aire durante este turno.' },
-
-  // Tier 4 (Level 4+)
-  { name: 'Ventisca Helada', tier: 4, type: 'Daño', desc: 'Crea un torbellino de granizo y hielo que congela y ralentiza a los enemigos en el área.' },
-  { name: 'Piel de Piedra', tier: 4, type: 'Defensa', desc: 'Tu piel se endurece como el granito, reduciendo a la mitad todo el daño físico recibido.' },
-  { name: 'Teletransportación Corta', tier: 4, type: 'Movimiento', desc: 'Te desvaneces y reapareces instantáneamente en cualquier lugar visible a corta distancia.' },
-  { name: 'Invocar Golem', tier: 4, type: 'Utilidad', desc: 'Invocas a un siervo de piedra temporal para que te defienda y pelee por ti.' },
-
-  // Tier 5 (Level 5+)
-  { name: 'Desintegración', tier: 5, type: 'Daño', desc: 'Lanza un rayo verde que inflige daño masivo y convierte al objetivo en polvo si es derrotado.' },
-  { name: 'Restauración Completa', tier: 5, type: 'Curación', desc: 'Sana por completo todas las heridas y remueve todos los estados negativos de un aventurero.' },
-  { name: 'Control Temporal', tier: 5, type: 'Utilidad', desc: 'Ralentizas el tiempo a tu alrededor para actuar dos veces o esquivar un peligro seguro.' },
-  { name: 'Deseo Menor', tier: 5, type: 'Utilidad', desc: 'Alteras levemente la realidad para obtener una ventaja narrativa directa del Game Master.' }
-];
+const DICE_GEOMETRY = {
+  D4: {
+    vertices: [
+      [1, 1, 1], [-1, -1, 1], [-1, 1, -1], [1, -1, -1]
+    ],
+    faces: [
+      { indices: [0, 1, 2], label: '1' },
+      { indices: [0, 2, 3], label: '2' },
+      { indices: [0, 3, 1], label: '3' },
+      { indices: [1, 3, 2], label: '4' }
+    ]
+  },
+  D6: {
+    vertices: [
+      [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+      [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]
+    ],
+    faces: [
+      { indices: [0, 1, 2, 3], label: '1' },
+      { indices: [5, 4, 7, 6], label: '6' },
+      { indices: [4, 0, 3, 7], label: '2' },
+      { indices: [1, 5, 6, 2], label: '5' },
+      { indices: [4, 5, 1, 0], label: '3' },
+      { indices: [3, 2, 6, 7], label: '4' }
+    ]
+  },
+  D8: {
+    vertices: [
+      [0, 0, 1.2], [1.2, 0, 0], [0, 1.2, 0], [-1.2, 0, 0], [0, -1.2, 0], [0, 0, -1.2]
+    ],
+    faces: [
+      { indices: [0, 1, 2], label: '1' },
+      { indices: [0, 2, 3], label: '2' },
+      { indices: [0, 3, 4], label: '3' },
+      { indices: [0, 4, 1], label: '4' },
+      { indices: [5, 2, 1], label: '5' },
+      { indices: [5, 3, 2], label: '6' },
+      { indices: [5, 4, 3], label: '7' },
+      { indices: [5, 1, 4], label: '8' }
+    ]
+  },
+  D10: {
+    vertices: [
+      [0, 0, 1.2], [0, 0, -1.2],
+      ...Array.from({length: 5}, (_, i) => {
+        const a = (i * 2 * Math.PI) / 5;
+        return [Math.cos(a), Math.sin(a), 0.2];
+      }),
+      ...Array.from({length: 5}, (_, i) => {
+        const a = ((i + 0.5) * 2 * Math.PI) / 5;
+        return [Math.cos(a), Math.sin(a), -0.2];
+      })
+    ],
+    faces: [
+      { indices: [0, 2, 3], label: '1' },
+      { indices: [0, 3, 4], label: '2' },
+      { indices: [0, 4, 5], label: '3' },
+      { indices: [0, 5, 6], label: '4' },
+      { indices: [0, 6, 2], label: '5' },
+      { indices: [1, 8, 7], label: '6' },
+      { indices: [1, 9, 8], label: '7' },
+      { indices: [1, 10, 9], label: '8' },
+      { indices: [1, 11, 10], label: '9' },
+      { indices: [1, 7, 11], label: '10' }
+    ]
+  },
+  D12: {
+    vertices: (() => {
+      const phi = (1 + Math.sqrt(5)) / 2;
+      return [
+        [-1, -1, -1], [-1, -1, 1], [-1, 1, -1], [-1, 1, 1],
+        [1, -1, -1], [1, -1, 1], [1, 1, -1], [1, 1, 1],
+        [0, -1/phi, -phi], [0, -1/phi, phi], [0, 1/phi, -phi], [0, 1/phi, phi],
+        [-1/phi, -phi, 0], [-1/phi, phi, 0], [1/phi, -phi, 0], [1/phi, phi, 0],
+        [-phi, 0, -1/phi], [-phi, 0, 1/phi], [phi, 0, -1/phi], [phi, 0, 1/phi]
+      ];
+    })(),
+    faces: [
+      { indices: [1, 9, 11, 3, 17], label: '1' },
+      { indices: [1, 17, 16, 0, 12], label: '2' },
+      { indices: [1, 12, 14, 5, 9], label: '3' },
+      { indices: [3, 11, 7, 15, 13], label: '4' },
+      { indices: [3, 13, 2, 10, 11], label: '5' },
+      { indices: [9, 5, 19, 7, 11], label: '6' },
+      { indices: [17, 3, 13, 2, 16], label: '7' },
+      { indices: [12, 0, 8, 4, 14], label: '8' },
+      { indices: [16, 2, 10, 8, 0], label: '9' },
+      { indices: [14, 4, 18, 19, 5], label: '10' },
+      { indices: [15, 7, 19, 5, 14], label: '11' },
+      { indices: [18, 6, 15, 7, 19], label: '12' }
+    ]
+  },
+  D20: {
+    vertices: (() => {
+      const phi = (1 + Math.sqrt(5)) / 2;
+      return [
+        [-1, phi, 0], [1, phi, 0], [-1, -phi, 0], [1, -phi, 0],
+        [0, -1, phi], [0, 1, phi], [0, -1, -phi], [0, 1, -phi],
+        [phi, 0, -1], [phi, 0, 1], [-phi, 0, -1], [-phi, 0, 1]
+      ];
+    })(),
+    faces: [
+      { indices: [0, 11, 5], label: '1' },
+      { indices: [0, 5, 1], label: '2' },
+      { indices: [0, 1, 7], label: '3' },
+      { indices: [0, 7, 10], label: '4' },
+      { indices: [0, 10, 11], label: '5' },
+      { indices: [1, 5, 9], label: '6' },
+      { indices: [5, 11, 4], label: '7' },
+      { indices: [11, 10, 2], label: '8' },
+      { indices: [10, 7, 6], label: '9' },
+      { indices: [7, 1, 8], label: '10' },
+      { indices: [3, 9, 4], label: '11' },
+      { indices: [3, 4, 2], label: '12' },
+      { indices: [3, 2, 6], label: '13' },
+      { indices: [3, 6, 8], label: '14' },
+      { indices: [3, 8, 9], label: '15' },
+      { indices: [4, 9, 5], label: '16' },
+      { indices: [2, 4, 11], label: '17' },
+      { indices: [6, 2, 10], label: '18' },
+      { indices: [8, 6, 7], label: '19' },
+      { indices: [9, 8, 1], label: '20' }
+    ]
+  }
+};
 
 export default function GameRoom() {
   const router = useRouter();
@@ -51,6 +147,18 @@ export default function GameRoom() {
   const [messageType, setMessageType] = useState('chat'); // 'chat' (OOC) or 'action'
   const [inputText, setInputText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Dice Animation State
+  const [rollingDice, setRollingDice] = useState(false);
+  const [rolledValue, setRolledValue] = useState(null);
+  const [diceTypeToRoll, setDiceTypeToRoll] = useState('D20');
+  const [rollerName, setRollerName] = useState('');
+
+  // Typing Indicator State & Refs
+  const [typingUsers, setTypingUsers] = useState([]);
+  const typingChannelRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+  const isCurrentlyTypingRef = useRef(false);
 
   // Campaign Description modal state
   const [showDescModal, setShowDescModal] = useState(false);
@@ -69,6 +177,7 @@ export default function GameRoom() {
   // Scroll anchor for chat
   const chatEndRef = useRef(null);
   const isInitialScrollRef = useRef(true);
+  const lastMessageCountRef = useRef(0);
 
   const [user, setUser] = useState(null);
 
@@ -109,6 +218,23 @@ export default function GameRoom() {
       // Redirect to character registration if not registered
       router.push(`/room/${roomId}/character`);
     } else {
+      // Ensure MP & MaxMP are initialized
+      const stats = player.stats || {};
+      const maxMp = player.magia ?? 10;
+      if (stats.MP === undefined || stats.MaxMP === undefined) {
+        const updatedStats = {
+          ...stats,
+          MP: stats.MP !== undefined ? stats.MP : maxMp,
+          MaxMP: stats.MaxMP !== undefined ? stats.MaxMP : maxMp
+        };
+        supabase
+          .from('players')
+          .update({ stats: updatedStats })
+          .eq('id', player.id)
+          .then(({ error }) => {
+            if (error) console.error("Error auto-initializing MP/MaxMP:", error);
+          });
+      }
       setCurrentPlayer(player);
       setIsCheckingPlayer(false);
     }
@@ -126,12 +252,210 @@ export default function GameRoom() {
     }
   }, [messages]);
 
+  // Trigger multiplayer dice rolling animation when another player rolls
+  useEffect(() => {
+    if (loading) return;
+    
+    if (messages.length > lastMessageCountRef.current) {
+      const newMsg = messages[messages.length - 1];
+      
+      if (newMsg && newMsg.message_type === 'action' && newMsg.dice_roll && newMsg.player_id !== currentPlayer?.id) {
+        const roller = players.find(p => p.id === newMsg.player_id);
+        const name = roller ? roller.name : 'Otro jugador';
+
+        // Synchronize dice rolling animation on spectating/other client
+        setRollerName(name);
+        setDiceTypeToRoll(room?.current_dice_type || 'D20');
+        setRollingDice(true);
+        setRolledValue(null);
+
+        // Let the dice roll with suspense for 900ms before stopping it on the rolled number
+        const timer = setTimeout(() => {
+          setRolledValue(newMsg.dice_roll);
+          
+          // Clear animation state after it settles
+          setTimeout(() => {
+            setRollingDice(false);
+            setRollerName('');
+          }, 2100);
+        }, 900);
+
+        lastMessageCountRef.current = messages.length;
+        return () => clearTimeout(timer);
+      }
+    }
+    
+    lastMessageCountRef.current = messages.length;
+  }, [messages, currentPlayer, players, room, loading]);
+
   // Redirect to end summary page when room status changes to finished
   useEffect(() => {
     if (room && room.status === 'finished') {
       router.push(`/room/${roomId}/end`);
     }
   }, [room, roomId, router]);
+
+  // Subscribe to typing broadcast channel
+  useEffect(() => {
+    if (!roomId || !currentPlayer || !room) return;
+
+    const channelName = `typing:${room.id}`;
+    const channel = supabase.channel(channelName);
+
+    channel
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        const { name, isTyping } = payload.payload;
+        setTypingUsers((prev) => {
+          if (isTyping) {
+            if (prev.includes(name)) return prev;
+            return [...prev, name];
+          } else {
+            return prev.filter(u => u !== name);
+          }
+        });
+      })
+      .subscribe();
+
+    typingChannelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId, currentPlayer, room]);
+
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!rollingDice) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Get geometry
+    const geomKey = diceTypeToRoll && DICE_GEOMETRY[diceTypeToRoll] ? diceTypeToRoll : 'D20';
+    const geometry = DICE_GEOMETRY[geomKey];
+    const faces = geometry.faces;
+
+    // Rotation angles and speeds
+    let rotX = Math.random() * Math.PI;
+    let rotY = Math.random() * Math.PI;
+    let rotZ = Math.random() * Math.PI;
+
+    let velX = 0.22 + Math.random() * 0.15;
+    let velY = 0.22 + Math.random() * 0.15;
+    let velZ = 0.15 + Math.random() * 0.10;
+
+    // 3D rotation math functions
+    const rotateX = (v, angle) => {
+      const c = Math.cos(angle), s = Math.sin(angle);
+      return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c];
+    };
+    const rotateY = (v, angle) => {
+      const c = Math.cos(angle), s = Math.sin(angle);
+      return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c];
+    };
+    const rotateZ = (v, angle) => {
+      const c = Math.cos(angle), s = Math.sin(angle);
+      return [v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]];
+    };
+
+    const project = (v) => {
+      // Scale based on canvas size
+      const scale = Math.min(width, height) * 0.35;
+      const zOffset = 3.2;
+      const px = (v[0] * scale) / (v[2] + zOffset) + width / 2;
+      const py = (v[1] * scale) / (v[2] + zOffset) + height / 2;
+      return { x: px, y: py, z: v[2] };
+    };
+
+    let animationFrameId;
+    let damping = 0.84; // Friction to slow it down
+    let settled = false;
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      // Apply rotation velocities
+      rotX += velX;
+      rotY += velY;
+      rotZ += velZ;
+
+      // Apply damping to simulate landing when rolledValue is set
+      if (rolledValue !== null) {
+        velX *= damping;
+        velY *= damping;
+        velZ *= damping;
+
+        if (Math.abs(velX) < 0.002 && Math.abs(velY) < 0.002 && Math.abs(velZ) < 0.002) {
+          velX = 0;
+          velY = 0;
+          velZ = 0;
+          settled = true;
+        }
+      }
+
+      // Rotate vertices
+      const rotated = geometry.vertices.map(v => {
+        let r = rotateX(v, rotX);
+        r = rotateY(r, rotY);
+        r = rotateZ(r, rotZ);
+        return r;
+      });
+
+      // Painter's algorithm: sort faces by depth
+      const sortedFaces = faces.map(face => {
+        const projectedPoints = face.indices.map(idx => project(rotated[idx]));
+        const avgZ = projectedPoints.reduce((sum, p) => sum + p.z, 0) / projectedPoints.length;
+        return { face, points: projectedPoints, avgZ };
+      }).sort((a, b) => b.avgZ - a.avgZ);
+
+      // Draw faces
+      sortedFaces.forEach(({ face, points, avgZ }) => {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+          ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.closePath();
+
+        // Calculate translucent intensity
+        const intensity = Math.max(0.1, Math.min(0.9, (1.5 - avgZ) / 3.0));
+
+        // Face color (semi-transparent Indigo/Blue gradient overlay)
+        ctx.fillStyle = `rgba(79, 70, 229, ${intensity * 0.45})`;
+        ctx.fill();
+
+        ctx.strokeStyle = `rgba(129, 140, 248, ${intensity})`;
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+
+        // Draw numbers on the front-facing faces (Z depth closer to camera)
+        if (avgZ < 0.1) {
+          const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+          const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+
+          ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0.4, intensity)})`;
+          ctx.font = `bold ${Math.max(11, Math.floor(15 * intensity))}px Inter, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(face.label, cx, cy);
+        }
+      });
+
+      if (!settled) {
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+
+    render();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [rollingDice, rolledValue, diceTypeToRoll]);
 
   if (loading || isCheckingPlayer) {
     return (
@@ -178,10 +502,50 @@ export default function GameRoom() {
     }
   };
 
+  const clearMyTypingState = () => {
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    isCurrentlyTypingRef.current = false;
+    if (typingChannelRef.current && currentPlayer) {
+      typingChannelRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { name: currentPlayer.name, isTyping: false }
+      });
+    }
+  };
+
+  const handleInputChange = (text) => {
+    setInputText(text);
+
+    if (!typingChannelRef.current || !currentPlayer) return;
+
+    if (!isCurrentlyTypingRef.current) {
+      isCurrentlyTypingRef.current = true;
+      typingChannelRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { name: currentPlayer.name, isTyping: true }
+      });
+    }
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      isCurrentlyTypingRef.current = false;
+      if (typingChannelRef.current) {
+        typingChannelRef.current.send({
+          type: 'broadcast',
+          event: 'typing',
+          payload: { name: currentPlayer.name, isTyping: false }
+        });
+      }
+    }, 1700);
+  };
+
   // Send OOC Chat Message
   const handleSendChat = async (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
+    clearMyTypingState();
 
     setSubmitting(true);
     try {
@@ -209,54 +573,218 @@ export default function GameRoom() {
   const handleDirectActionSubmit = async (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
+    clearMyTypingState();
+
     setSubmitting(true);
     const actionTextToSend = inputText.trim();
     setInputText('');
 
+    // Check if player is casting a spell by checking for [Spell Name] in the action text
+    let spellToCast = null;
+    let spellMatch = actionTextToSend.match(/\[([^\]]+)\]/);
+    if (spellMatch) {
+      const spellName = spellMatch[1].trim();
+      const spell = SPELL_LIBRARY.find(s => s.name.toLowerCase() === spellName.toLowerCase());
+      if (spell) {
+        spellToCast = spell;
+      }
+    }
+
+    if (spellToCast) {
+      // Validate that player has enough MP
+      const currentMp = currentPlayer.stats?.MP ?? 0;
+      const cost = spellToCast.tier;
+      if (currentMp < cost) {
+        alert(`No tienes suficientes Puntos de Magia para lanzar [${spellToCast.name}]. Requiere ${cost} PM, pero solo tienes ${currentMp} PM. ¡Necesitas descansar/dormir para recargar tu magia!`);
+        setInputText(actionTextToSend); // Restore action text
+        setSubmitting(false);
+        return;
+      }
+
+      // Deduct MP in the database before sending action
+      try {
+        const updatedStats = {
+          ...currentPlayer.stats,
+          MP: Math.max(0, currentMp - cost)
+        };
+        const { error: updateError } = await supabase
+          .from('players')
+          .update({ stats: updatedStats })
+          .eq('id', currentPlayer.id);
+        if (updateError) throw updateError;
+      } catch (err) {
+        console.error('Error al descontar puntos de magia:', err);
+        alert('Error al descontar puntos de magia. No se pudo lanzar el hechizo.');
+        setInputText(actionTextToSend); // Restore action text
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    // Compute client-side dice roll first
+    const diceType = room.current_dice_type || 'D20';
+    const maxRoll = parseInt(diceType.replace('D', ''), 10) || 20;
+    const clientRoll = Math.floor(Math.random() * maxRoll) + 1;
+
+    // A. Insert player action message immediately so it appears on screen for everyone
+    let playerMsgId = null;
     try {
-      // Call consolidated backend API action route
+      const { data: newMsg, error: insertError } = await supabase.from('messages').insert([
+        {
+          room_id: room.id,
+          sender_type: 'player',
+          player_id: currentPlayer.id,
+          message_type: 'action',
+          content: actionTextToSend,
+          dice_roll: clientRoll
+        }
+      ]).select().single();
+
+      if (insertError) throw insertError;
+      playerMsgId = newMsg.id;
+    } catch (err) {
+      console.error('Error inserting message client side:', err);
+      alert('Error de conexión al enviar la acción.');
+      setInputText(actionTextToSend);
+      setSubmitting(false);
+      return;
+    }
+
+    // Trigger rolling dice animation locally
+    setDiceTypeToRoll(diceType);
+    setRollingDice(true);
+    setRolledValue(null);
+
+    try {
+      // Call consolidated backend API action route with the pre-inserted message and roll
       const res = await fetch('/api/room/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roomId,
           playerId: currentPlayer.id,
-          actionText: actionTextToSend
+          actionText: actionTextToSend,
+          clientRoll: clientRoll,
+          clientMessageId: playerMsgId
         })
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo procesar la acción.');
+
+      if (data.roll && data.dice_roll_used) {
+        setRolledValue(data.roll);
+        // Automatically hide rolling overlay after showing the result
+        setTimeout(() => {
+          setRollingDice(false);
+        }, 1300);
+      } else {
+        setRollingDice(false);
+      }
     } catch (err) {
       console.error('Error al realizar la acción:', err);
       alert(err.message || 'Error al procesar tu acción. Inténtalo de nuevo.');
+      setRollingDice(false);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleLearnSpell = async (spellName) => {
+  const handleSleep = async () => {
+    if (submitting) return;
+    if (!confirm('¿Estás seguro de que quieres intentar dormir/descansar? Si el Game Master lo permite, quedarás profundamente dormido por 2 turnos (sin poder actuar), pero al despertar recuperarás toda tu vida y magia.')) return;
+    
     setSubmitting(true);
+    const actionText = `Intento acostarme a dormir profundamente para descansar y recuperar mis fuerzas y magia.`;
+    let playerMsgId = null;
     try {
-      const currentStats = currentPlayer.stats || {};
-      const currentSpells = currentStats.spells || [];
-      if (currentSpells.includes(spellName)) return;
+      const { data: newMsg, error: insertError } = await supabase.from('messages').insert([
+        {
+          room_id: room.id,
+          sender_type: 'player',
+          player_id: currentPlayer.id,
+          message_type: 'action',
+          content: actionText,
+          dice_roll: null
+        }
+      ]).select().single();
 
-      const updatedSpells = [...currentSpells, spellName];
-      const updatedStats = {
-        ...currentStats,
-        spells: updatedSpells
-      };
-
-      const { error: updateError } = await supabase
-        .from('players')
-        .update({ stats: updatedStats })
-        .eq('id', currentPlayer.id);
-
-      if (updateError) throw updateError;
+      if (insertError) throw insertError;
+      playerMsgId = newMsg.id;
     } catch (err) {
-      console.error('Error al aprender el conjuro:', err);
-      alert('Error al aprender el conjuro: ' + err.message);
+      console.error('Error inserting sleep message:', err);
+      alert('Error de conexión al intentar descansar.');
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      // Submit narrative action to GM. If allowed, the GM response will set sleeping_rounds = 2.
+      const res = await fetch('/api/room/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId,
+          playerId: currentPlayer.id,
+          actionText: actionText,
+          clientRoll: null,
+          clientMessageId: playerMsgId
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo procesar la acción de descanso.');
+    } catch (err) {
+      console.error('Error al intentar descansar:', err);
+      alert('Error al intentar descansar: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePassSleepTurn = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    const actionText = `${currentPlayer.name} continúa durmiendo profundamente.`;
+    let playerMsgId = null;
+    try {
+      const { data: newMsg, error: insertError } = await supabase.from('messages').insert([
+        {
+          room_id: room.id,
+          sender_type: 'player',
+          player_id: currentPlayer.id,
+          message_type: 'action',
+          content: actionText,
+          dice_roll: null
+        }
+      ]).select().single();
+
+      if (insertError) throw insertError;
+      playerMsgId = newMsg.id;
+    } catch (err) {
+      console.error('Error inserting pass sleep message:', err);
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/room/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId,
+          playerId: currentPlayer.id,
+          actionText: actionText,
+          clientRoll: null,
+          clientMessageId: playerMsgId
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo pasar el turno de descanso.');
+    } catch (err) {
+      console.error('Error al pasar el turno de descanso:', err);
+      alert('Error al pasar el turno: ' + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -274,10 +802,9 @@ export default function GameRoom() {
     }, 100);
   };
 
-  const hasMagic = currentPlayer && (
-    ['Mago', 'Clérigo', 'Bardo'].includes(currentPlayer.class) || 
-    (currentPlayer.magia ?? 10) >= 12
-  );
+  const hasMagic = currentPlayer && ['Mago', 'Clérigo', 'Bardo'].includes(currentPlayer.class);
+
+  const isSleeping = (currentPlayer?.stats?.sleeping_rounds ?? 0) > 0;
 
   return (
     <div style={styles.container}>
@@ -296,11 +823,15 @@ export default function GameRoom() {
               background: room.turn_mode === 'ordered' ? '#ef4444' : '#10b981',
               color: '#ffffff',
               fontSize: '0.75rem',
-              padding: '0.15rem 0.5rem',
+              padding: '0 0.5rem',
+              height: '24px',
               borderRadius: '4px',
               fontWeight: '600',
               marginLeft: '0.5rem',
-              textTransform: 'uppercase'
+              textTransform: 'uppercase',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
               {room.turn_mode === 'ordered' ? '⚔️ Turnos Ordenados' : '🕊️ Exploración Libre'}
             </span>
@@ -358,6 +889,12 @@ export default function GameRoom() {
                       <span style={styles.statLabel}>HP</span>
                       <span style={styles.statVal}>{p.stats?.HP ?? 100}</span>
                     </div>
+                    {(['Mago', 'Clérigo', 'Bardo'].includes(p.class) || (p.magia ?? 10) >= 12) && (
+                      <div style={styles.statItem}>
+                        <span style={styles.statLabel}>PM</span>
+                        <span style={styles.statVal}>{p.stats?.MP ?? 0}</span>
+                      </div>
+                    )}
                     <div style={styles.statItem}>
                       <span style={styles.statLabel}>LVL</span>
                       <span style={styles.statVal}>{p.stats?.Level ?? 1}</span>
@@ -433,6 +970,7 @@ export default function GameRoom() {
                     key={m.id} 
                     style={{
                       ...styles.playerMsg,
+                      alignSelf: isAction ? 'flex-end' : 'flex-start',
                       ...(isAction ? styles.playerMsgAction : {})
                     }}
                   >
@@ -455,6 +993,24 @@ export default function GameRoom() {
                   </div>
                 );
               })
+            )}
+            {typingUsers.length > 0 && (
+              <div style={{
+                alignSelf: 'flex-start',
+                padding: '0.4rem 1.25rem',
+                fontSize: '0.82rem',
+                color: 'var(--secondary)',
+                fontStyle: 'italic',
+                backgroundColor: 'rgba(30, 41, 59, 0.4)',
+                border: '1px dashed var(--border)',
+                borderRadius: '8px',
+                marginTop: '0.5rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}>
+                💬 {typingUsers.join(', ')} {typingUsers.length === 1 ? 'está escribiendo...' : 'están escribiendo...'}
+              </div>
             )}
             <div ref={chatEndRef} />
           </div>
@@ -555,15 +1111,17 @@ export default function GameRoom() {
                   >
                     Realizar Acción
                   </button>
-                  <button 
-                    style={{
-                      ...styles.toggleTab,
-                      ...(messageType === 'spells' ? styles.toggleTabActive : {})
-                    }}
-                    onClick={() => setMessageType('spells')}
-                  >
-                    🪄 Libro de Hechizos
-                  </button>
+                  {hasMagic && (
+                    <button 
+                      style={{
+                        ...styles.toggleTab,
+                        ...(messageType === 'spells' ? styles.toggleTabActive : {})
+                      }}
+                      onClick={() => setMessageType('spells')}
+                    >
+                      🪄 Libro de Hechizos
+                    </button>
+                  )}
                 </div>
 
                 {/* If Out-Of-Character Chat is Active */}
@@ -573,7 +1131,7 @@ export default function GameRoom() {
                       type="text"
                       placeholder="Habla fuera de juego (ej: ¿Deberíamos forzar la puerta?)"
                       value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
+                      onChange={(e) => handleInputChange(e.target.value)}
                       style={styles.consoleInput}
                       disabled={submitting}
                       required
@@ -587,7 +1145,32 @@ export default function GameRoom() {
                 {/* If In-Game Action Turn is Active */}
                 {messageType === 'action' && (
                   <div style={styles.actionConsole}>
-                    {room.turn_mode === 'ordered' && room.active_player_id !== currentPlayer.id ? (
+                    {isSleeping ? (
+                      <div style={{
+                        backgroundColor: 'rgba(30, 27, 75, 0.4)',
+                        border: '1px dashed #4338ca',
+                        borderRadius: '8px',
+                        padding: '1.5rem',
+                        textAlign: 'center',
+                        width: '100%'
+                      }}>
+                        <p style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', color: '#a5b4fc', fontWeight: 'bold' }}>
+                          😴 Estás durmiendo profundamente para recuperar tus fuerzas...
+                        </p>
+                        <div style={{ fontSize: '0.9rem', color: 'var(--secondary)', marginBottom: '1.25rem' }}>
+                          Despertarás en <strong>{currentPlayer.stats.sleeping_rounds}</strong> {currentPlayer.stats.sleeping_rounds === 1 ? 'turno' : 'turnos'}.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handlePassSleepTurn}
+                          className="btn enter-btn"
+                          disabled={submitting}
+                          style={{ margin: '0 auto', display: 'block' }}
+                        >
+                          {submitting ? 'Avanzando tiempo...' : '⌛ Esperar / Avanzar Turno'}
+                        </button>
+                      </div>
+                    ) : room.turn_mode === 'ordered' && room.active_player_id !== currentPlayer.id ? (
                       // Waiting for Turn
                       <div style={styles.turnNotification}>
                         <span>⌛ Espera tu turno. Actualmente es el turno de <strong>{activePlayer ? activePlayer.name : 'otro jugador'}</strong>.</span>
@@ -598,7 +1181,7 @@ export default function GameRoom() {
                         <textarea
                           placeholder="Describe tu acción física o conjuro (ej: Desenvaino mi espada e intento golpear al orco...)"
                           value={inputText}
-                          onChange={(e) => setInputText(e.target.value)}
+                          onChange={(e) => handleInputChange(e.target.value)}
                           style={styles.actionTextarea}
                           disabled={submitting}
                           required
@@ -618,108 +1201,136 @@ export default function GameRoom() {
                 {/* If Spellbook Console is Active */}
                 {messageType === 'spells' && (
                   <div style={styles.spellsConsole}>
-                    {/* Spell slots status */}
-                    <div style={styles.spellsHeader}>
-                      <h3 style={{ margin: 0 }}>Libro de Hechizos</h3>
-                      <span style={styles.spellSlotsBadge}>
-                        Hechizos: {currentPlayer.stats?.spells?.length || 0} / {(currentPlayer.stats?.Level ?? 1) + 2} preparados
-                      </span>
-                    </div>
-
-                    {/* Learn spells notification */}
-                    {(() => {
-                      const maxSpells = (currentPlayer.stats?.Level ?? 1) + 2;
-                      const learnedSpells = currentPlayer.stats?.spells || [];
-                      const slotsAvailable = maxSpells - learnedSpells.length;
-                      if (slotsAvailable > 0) {
-                        return (
-                          <div style={styles.learnAlert}>
-                            ✨ Tienes <strong>{slotsAvailable}</strong> ranura(s) de conjuro disponibles para aprender nuevos hechizos de Nivel {currentPlayer.stats?.Level ?? 1} o menor.
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    {/* Spells Grid */}
-                    <div style={styles.spellsSplitGrid}>
-                      
-                      {/* Left: Prepared Spells */}
-                      <div style={styles.spellsColumn}>
-                        <h4 style={styles.spellsColumnTitle}>Conjuros Preparados</h4>
-                        <div style={styles.spellsList}>
-                          {(!currentPlayer.stats?.spells || currentPlayer.stats.spells.length === 0) ? (
-                            <p style={styles.emptySpellsText}>No tienes conjuros preparados. Aprende algunos de la biblioteca a la derecha.</p>
-                          ) : (
-                            currentPlayer.stats.spells.map((spellName) => {
-                              const spell = SPELL_LIBRARY.find(s => s.name === spellName) || { name: spellName, desc: 'Conjuro misterioso.', type: 'Desconocido', tier: 1 };
-                              return (
-                                <div key={spell.name} style={styles.spellCard}>
-                                  <div style={styles.spellCardMeta}>
-                                    <span style={styles.spellCardName}>🪄 {spell.name}</span>
-                                    <span style={styles.spellCardTier}>Nivel {spell.tier} • {spell.type}</span>
-                                  </div>
-                                  <p style={styles.spellCardDesc}>{spell.desc}</p>
-                                  <button 
-                                    className="btn" 
-                                    onClick={() => handleCastSpell(spell.name)}
-                                    style={styles.castBtn}
-                                    disabled={submitting}
-                                  >
-                                    Lanzar Hechizo
-                                  </button>
-                                </div>
-                              );
-                            })
-                          )}
+                    {isSleeping ? (
+                      <div style={{
+                        backgroundColor: 'rgba(30, 27, 75, 0.4)',
+                        border: '1px dashed #4338ca',
+                        borderRadius: '8px',
+                        padding: '1.5rem',
+                        textAlign: 'center',
+                        width: '100%'
+                      }}>
+                        <p style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', color: '#a5b4fc', fontWeight: 'bold' }}>
+                          😴 Estás durmiendo profundamente para recuperar tus fuerzas...
+                        </p>
+                        <div style={{ fontSize: '0.9rem', color: 'var(--secondary)', marginBottom: '1.25rem' }}>
+                          Despertarás en <strong>{currentPlayer.stats.sleeping_rounds}</strong> {currentPlayer.stats.sleeping_rounds === 1 ? 'turno' : 'turnos'}.
                         </div>
+                        <button
+                          type="button"
+                          onClick={handlePassSleepTurn}
+                          className="btn enter-btn"
+                          disabled={submitting}
+                          style={{ margin: '0 auto', display: 'block' }}
+                        >
+                          {submitting ? 'Avanzando tiempo...' : '⌛ Esperar / Avanzar Turno'}
+                        </button>
                       </div>
+                    ) : (
+                      <>
+                        {/* Spell slots status */}
+                        <div style={styles.spellsHeader}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <h3 style={{ margin: 0 }}>Libro de Hechizos</h3>
+                            <span style={{
+                              background: 'var(--accent)',
+                              color: '#ffffff',
+                              fontSize: '0.82rem',
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '12px',
+                              fontWeight: 'bold',
+                              boxShadow: '0 0 10px rgba(129, 140, 248, 0.3)'
+                            }}>
+                              🔮 PM: {currentPlayer.stats?.MP ?? 0} / {currentPlayer.stats?.MaxMP ?? (currentPlayer.magia ?? 10)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleSleep}
+                            className="btn enter-btn"
+                            disabled={submitting}
+                            style={{
+                              fontSize: '0.82rem',
+                              padding: '0.35rem 0.8rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              marginLeft: 'auto'
+                            }}
+                          >
+                            😴 Descansar / Dormir
+                          </button>
+                        </div>
 
-                      {/* Right: Available Spells to Learn */}
-                      <div style={styles.spellsColumn}>
-                        <h4 style={styles.spellsColumnTitle}>Biblioteca de Hechizos (Nivel {currentPlayer.stats?.Level ?? 1})</h4>
-                        <div style={styles.spellsList}>
+                        <div style={{ ...styles.spellsList, marginTop: '1rem' }}>
                           {(() => {
                             const currentLvl = currentPlayer.stats?.Level ?? 1;
-                            const learnedSpells = currentPlayer.stats?.spells || [];
-                            const maxSpells = currentLvl + 2;
-                            const hasSlots = learnedSpells.length < maxSpells;
-                            
-                            // Filter spells that the player is eligible to learn (tier <= current player level) and hasn't learned yet
-                            const availableToLearn = SPELL_LIBRARY.filter(
-                              s => s.tier <= currentLvl && !learnedSpells.includes(s.name)
-                            );
+                            const availableSpells = SPELL_LIBRARY.filter(s => s.tier <= currentLvl);
 
-                            if (availableToLearn.length === 0) {
-                              return <p style={styles.emptySpellsText}>Has aprendido todos los hechizos disponibles para tu nivel actual.</p>;
+                            if (availableSpells.length === 0) {
+                              return <p style={styles.emptySpellsText}>No hay hechizos disponibles para tu nivel actual.</p>;
                             }
 
-                            return availableToLearn.map((spell) => (
-                              <div key={spell.name} style={{...styles.spellCard, backgroundColor: '#0b111e', borderColor: '#1e293b'}}>
-                                <div style={styles.spellCardMeta}>
-                                  <span style={{...styles.spellCardName, color: 'var(--secondary)'}}>{spell.name}</span>
-                                  <span style={styles.spellCardTier}>Nivel {spell.tier} • {spell.type}</span>
-                                </div>
-                                <p style={styles.spellCardDesc}>{spell.desc}</p>
-                                <button 
-                                  className="btn enter-btn" 
-                                  onClick={() => handleLearnSpell(spell.name)}
-                                  disabled={submitting || !hasSlots}
-                                  style={{
-                                    ...styles.castBtn,
-                                    opacity: hasSlots ? 1 : 0.5,
-                                    cursor: hasSlots ? 'pointer' : 'not-allowed'
-                                  }}
-                                >
-                                  Aprender
-                                </button>
+                            return (
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                gap: '1rem',
+                                width: '100%'
+                              }}>
+                                {availableSpells.map((spell) => {
+                                  const cost = spell.tier;
+                                  const canAfford = (currentPlayer.stats?.MP ?? 0) >= cost;
+                                  return (
+                                    <div key={spell.name} style={{
+                                      ...styles.spellCard,
+                                      borderColor: canAfford ? '#4338ca' : '#ef4444',
+                                      backgroundColor: canAfford ? '#0f172a' : '#1a1212',
+                                      margin: 0,
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      justifyContent: 'space-between'
+                                    }}>
+                                      <div>
+                                        <div style={styles.spellCardMeta}>
+                                          <span style={styles.spellCardName}>🪄 {spell.name}</span>
+                                          <span style={{
+                                            ...styles.spellCardTier,
+                                            color: canAfford ? '#818cf8' : '#ef4444'
+                                          }}>
+                                            Niv {spell.tier} • {cost} PM
+                                          </span>
+                                        </div>
+                                        <p style={styles.spellCardDesc}>{spell.desc}</p>
+                                      </div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', borderTop: '1px solid #1e293b', paddingTop: '0.5rem' }}>
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--secondary)' }}>
+                                          {spell.type}
+                                        </span>
+                                        <button 
+                                          className="btn" 
+                                          onClick={() => handleCastSpell(spell.name)}
+                                          style={{
+                                            ...styles.castBtn,
+                                            backgroundColor: canAfford ? 'var(--accent)' : '#374151',
+                                            cursor: canAfford ? 'pointer' : 'not-allowed',
+                                            fontSize: '0.75rem',
+                                            padding: '0.2rem 0.5rem'
+                                          }}
+                                          disabled={submitting || !canAfford}
+                                        >
+                                          {canAfford ? 'Lanzar' : 'Sin PM'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            ));
+                            );
                           })()}
                         </div>
-                      </div>
-
-                    </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -741,6 +1352,9 @@ export default function GameRoom() {
               <h4>Estadísticas</h4>
               <ul style={styles.modalList}>
                 <li><strong>Vida (HP):</strong> {modalPlayer.stats?.HP ?? 100} / {modalPlayer.salud ?? 100}</li>
+                {(['Mago', 'Clérigo', 'Bardo'].includes(modalPlayer.class) || (modalPlayer.magia ?? 10) >= 12) && (
+                  <li><strong>Puntos de Magia (PM):</strong> {modalPlayer.stats?.MP ?? 0} / {modalPlayer.stats?.MaxMP ?? (modalPlayer.magia ?? 10)}</li>
+                )}
                 <li><strong>Nivel (Level):</strong> {modalPlayer.stats?.Level ?? 1}</li>
                 <li><strong>Experiencia (XP):</strong> {modalPlayer.stats?.XP ?? 0}</li>
               </ul>
@@ -771,15 +1385,22 @@ export default function GameRoom() {
               </div>
             )}
 
-            {modalPlayer.stats?.spells && modalPlayer.stats.spells.length > 0 && (
+            {(['Mago', 'Clérigo', 'Bardo'].includes(modalPlayer.class) || (modalPlayer.magia ?? 10) >= 12) && (
               <div style={styles.modalSection}>
-                <h4>Conjuros Preparados</h4>
+                <h4>Libro de Hechizos</h4>
                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-                  {modalPlayer.stats.spells.map((spell, sIdx) => (
-                    <span key={sIdx} className="creator-badge" style={{ background: '#1e1b4b', border: '1px solid #4338ca', textTransform: 'none', fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginLeft: 0 }}>
-                      🪄 {spell}
-                    </span>
-                  ))}
+                  {(() => {
+                    const level = modalPlayer.stats?.Level ?? 1;
+                    const eligibleSpells = SPELL_LIBRARY.filter(s => s.tier <= level);
+                    if (eligibleSpells.length === 0) {
+                      return <span style={{ fontSize: '0.8rem', color: 'var(--secondary)' }}>Ninguno</span>;
+                    }
+                    return eligibleSpells.map((spell, sIdx) => (
+                      <span key={sIdx} className="creator-badge" style={{ background: '#1e1b4b', border: '1px solid #4338ca', textTransform: 'none', fontSize: '0.8rem', padding: '0.2rem 0.5rem', marginLeft: 0 }}>
+                        🪄 {spell.name} (Niv {spell.tier})
+                      </span>
+                    ));
+                  })()}
                 </div>
               </div>
             )}
@@ -820,6 +1441,128 @@ export default function GameRoom() {
             >
               Cerrar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3D Dice Throwing Overlay Modal */}
+      {rollingDice && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(5, 5, 10, 0.92)',
+          zIndex: 10000,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          backdropFilter: 'blur(8px)',
+        }}>
+          <div style={{
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            backgroundColor: '#0f172a',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            padding: '2.5rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.25)',
+            maxWidth: '450px',
+            width: '90%',
+            textAlign: 'center'
+          }}>
+            <h2 style={{
+              margin: '0 0 0.5rem 0',
+              fontSize: '1.6rem',
+              fontWeight: 'bold',
+              background: 'linear-gradient(135deg, #a5b4fc 0%, #6366f1 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}>
+              🎲 {rollerName ? `${rollerName} lanza ${diceTypeToRoll}` : `Lanzando ${diceTypeToRoll}`}
+            </h2>
+            <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.88rem', color: 'var(--secondary)' }}>
+              {rollerName ? '¿Qué dirán los dados?' : 'El destino está en movimiento...'}
+            </p>
+
+            <div style={{
+              position: 'relative',
+              width: '280px',
+              height: '280px',
+              backgroundColor: '#0b0f19',
+              border: '1px solid #1e293b',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              boxShadow: 'inset 0 0 20px rgba(0, 0, 0, 0.8)'
+            }}>
+              <canvas
+                ref={canvasRef}
+                width={280}
+                height={280}
+                style={{ display: 'block' }}
+              />
+
+              {/* Splash value overlay once rolledValue is settled */}
+              {rolledValue !== null && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(11, 15, 25, 0.75)',
+                  animation: 'fadeIn 0.3s ease-out forwards',
+                }}>
+                  <div style={{
+                    fontSize: '4.8rem',
+                    fontWeight: '900',
+                    color: '#ffffff',
+                    textShadow: '0 0 20px rgba(99, 102, 241, 0.8), 0 0 40px rgba(99, 102, 241, 0.4)',
+                    animation: 'scaleUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+                  }}>
+                    {rolledValue}
+                  </div>
+                  <div style={{
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    color: '#a5b4fc',
+                    marginTop: '0.5rem',
+                    letterSpacing: '1px',
+                    animation: 'fadeInUp 0.4s ease-out 0.2s forwards',
+                    opacity: 0
+                  }}>
+                    ¡TIRADA COMPLETADA!
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Animations Styles Keyframes */}
+            <style dangerouslySetInnerHTML={{__html: `
+              @keyframes fadeIn {
+                from { opacity: 0; backdrop-filter: blur(0px); }
+                to { opacity: 1; backdrop-filter: blur(4px); }
+              }
+              @keyframes scaleUp {
+                from { transform: scale(0.5); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+              }
+              @keyframes fadeInUp {
+                from { transform: translateY(10px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+              }
+            `}} />
           </div>
         </div>
       )}
@@ -1006,9 +1749,11 @@ const styles = {
     fontStyle: 'italic',
   },
   gmMsg: {
+    alignSelf: 'flex-start',
+    maxWidth: '85%',
     backgroundColor: '#131c2e',
     borderLeft: '4px solid var(--accent)',
-    borderRadius: '0 8px 8px 0',
+    borderRadius: '8px',
     padding: '1.25rem 1.5rem',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
   },

@@ -204,7 +204,9 @@ export default function CharacterCreation() {
             HP: characterToJoin.salud || 100, 
             Level: 1, 
             XP: 0,
-            spells: characterToJoin.spells || [] 
+            spells: characterToJoin.spells || [],
+            MP: characterToJoin.magia || 10,
+            MaxMP: characterToJoin.magia || 10
           },
           fuerza: characterToJoin.fuerza || 10,
           destreza: characterToJoin.destreza || 10,

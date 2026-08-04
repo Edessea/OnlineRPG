@@ -13,14 +13,8 @@ const ALL_SKILLS = [
   "Criptografía", "Historia Antigua", "Cocina Rápida", "Contabilidad", "Oratoria Pública"
 ];
 
-const SPELL_LIBRARY = [
-  { name: 'Proyectil Mágico', tier: 1, type: 'Daño', desc: 'Lanza tres dardos de fuerza pura que golpean infaliblemente a tus enemigos.' },
-  { name: 'Curar Heridas Leves', tier: 1, type: 'Curación', desc: 'Restaura una pequeña cantidad de HP a ti o a un aliado cercano.' },
-  { name: 'Escudo de Fuerza', tier: 1, type: 'Defensa', desc: 'Crea una barrera mágica invisible que te protege de los ataques de este turno.' },
-  { name: 'Luz Divina', tier: 1, type: 'Utilidad', desc: 'Ilumina una habitación oscura o ciega temporalmente a un enemigo.' }
-];
+import { SPELL_LIBRARY } from '../lib/spells';
 
-const STARTING_SPELLS = SPELL_LIBRARY.map(s => s.name);
 
 export default function Home() {
   const router = useRouter();
@@ -98,6 +92,21 @@ export default function Home() {
       fetchUserData(parsedUser.id);
     }
   }, []);
+
+  // Roll initial spells for magic-using classes if stats have been rolled
+  useEffect(() => {
+    if (hasRolled) {
+      if (['Mago', 'Clérigo', 'Bardo'].includes(newCharClass)) {
+        const tier1 = SPELL_LIBRARY.filter(s => s.tier === 1);
+        const shuffled = [...tier1].sort(() => 0.5 - Math.random());
+        setRolledSpells([shuffled[0].name, shuffled[1].name]);
+      } else {
+        setRolledSpells([]);
+      }
+    } else {
+      setRolledSpells([]);
+    }
+  }, [newCharClass, hasRolled]);
 
   const fetchUserData = async (userId) => {
     setFetchingData(true);
@@ -465,8 +474,7 @@ export default function Home() {
     const diceResults = Array.from({ length: 6 }, () => Math.floor(Math.random() * 20) + 1);
     const shuffledSkills = [...ALL_SKILLS].sort(() => 0.5 - Math.random());
     const selectedSkills = shuffledSkills.slice(0, 3);
-    const shuffledSpells = [...STARTING_SPELLS].sort(() => 0.5 - Math.random());
-    const selectedSpells = shuffledSpells.slice(0, 2);
+    const selectedSpells = [];
     
     setTimeout(() => {
       setRolledDice(diceResults);
